@@ -64,7 +64,7 @@ void CnvH::add(FVector const* p_vec, const int idx) {
 	case planar: {
 		std::cout << "Planar" << std::endl;
 		state = volume;
-/*		if (cross(newPnt.vec, quads[0].normal) == FV_ZERO) {	// if new point IS in the same plane
+		if (cross(newPnt.vec, quads[0].normal) == FV_ZERO) {	// if new point IS in the same plane
 			state = volume;
 			// TODO: Select edge
 			// TODO: Clone verecies
@@ -73,12 +73,20 @@ void CnvH::add(FVector const* p_vec, const int idx) {
 		}
 		else {													// if new point is NOT in the same plane
 			state = volume;
+			std::cout << "Plane to volume extrude - " << newPnt.vec << std::endl;
+
+			std::vector<quad> facingQuads;
+			std::unordered_set<size_t> facingPoints;
+
+			std::vector<quad> nonFacingQuads;
+			std::unordered_set<size_t> nonFacingPoints;
+
 			// TODO: Flip Normals
 			// TODO: Select edge
 			// TODO: Clone verecies
 			// TODO: Build quads
 			// TODO: Move
-		}*/
+		}
 	} break;
 
 	/////////////////////////////////
@@ -134,6 +142,7 @@ void CnvH::add(FVector const* p_vec, const int idx) {
 		// order the edge point in a loop container so each point MUST share a quad with the next point in the container
 
 		std::unordered_set<size_t> edgeLoop;
+		assert(!edgePoints.empty());
 		size_t loopPoint = *edgePoints.begin();
 
 		while (edgeLoop.size() < edgePoints.size()) {
@@ -222,6 +231,10 @@ CnvH::point operator+(const CnvH::point& A, const CnvH::point& B) {
 	CnvH::point result;
 	result.vec = A.vec + B.vec;
 	result.weight.insert(A.weight.begin(), A.weight.end());
-	result.weight.insert(B.weight.begin(), B.weight.end());
+	for (auto it = B.weight.begin(); it != B.weight.end(); ++it) {
+		auto insert = result.weight.insert(*it);
+		if (!insert.second)
+			insert.first->second += it->second;
+	}
 	return result;
 }

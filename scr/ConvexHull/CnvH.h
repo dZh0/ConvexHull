@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include "FVector.h"
 
+template <class T = FVector>
 class CnvH {
 public:
 
@@ -31,12 +32,12 @@ public:
 	};
 
 	CnvH() :state(empty) {};						// Default constructor
-	CnvH(FVector const* arr, const int _size);		// Array constructor
+	CnvH(T const* arr, const int _size);		// Array constructor
 	void add(FVector const* p_vec, const int idx);
 	
 private:
 	geometry state;									// Geometric state: linear, planae etc.
-	std::vector<FVector const*> collection;			// Colection of references TODO: set template class container
+	std::vector<T const*> collection;			// Colection of references TODO: set template class container
 	std::vector<point> points;						// Points of the Convex Hull (INDEXED CONTAINER!)
 	std::vector<quad> quads;						// Quads of the Convex Hull
 };

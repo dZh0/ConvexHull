@@ -1,6 +1,6 @@
 // Vectors.cpp : Defines the entry point for the console application.
 
-//dummy depenancies
+//dummy dependancies
 #include "FVector.h"		// Simple float Vector 3D implementation
 #include "AThruster.h"		// Dummy spaceship thruster implementation
 //true dependancies
@@ -30,17 +30,25 @@ const AThruster engines[DATA_SIZE] = {
 
 int main() {
 	//Create force and momentum arrays.
-	FVector force[DATA_SIZE];
+/*	FVector force[DATA_SIZE];
 	FVector momentum[DATA_SIZE];
 	for (int i = 0; i < DATA_SIZE; i++) {
 		const AThruster* E = engines+i;
 		force[i] = E->thrust;
 		momentum[i] = cross(E->position, E->thrust);
 	}
-	/* Create force combination and momentum combination
-	convex hulls from force and momentum arrays.*/
+	// Create force combination and momentum combination convex hulls from force and momentum arrays.
 	CnvH CH_maxForce(force, DATA_SIZE);
 	CnvH CH_maxMomentum(momentum, DATA_SIZE);
-
+*/
+	CnvH CH_empty;
+	int i = 0;
+	float A, B, C;
+	do {
+		std::cin >> A >> B >> C;
+		FVector vec = { A, B, C };
+		CH_empty.add(&vec,i);
+		i++;
+	} while (A || B || C);
     return 0;
 }

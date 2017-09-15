@@ -1,5 +1,7 @@
 // TextCnvH.cpp : Defines the entry point for the console application.
 
+//debug depenancies
+#include <iostream>
 //dummy depenancies
 #include "FVector.h"		// Simple float Vector 3D implementation
 #include "AThruster.h"		// Dummy spaceship thruster implementation
@@ -36,7 +38,7 @@ int main() {
 		std::cout << "Enter extrusion vector: ";
 		std::cin >> A >> B >> C;
 		vec = { A, B, C };
-		CH_empty.add(&vec, idx);
+		CH_empty.add(vec, idx);
 		idx++;
 	} while (vec != FV_ZERO);
     return 0;

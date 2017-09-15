@@ -1,14 +1,11 @@
 // debug dependencies
-#ifndef _IOSTREAM_
 #include <iostream>
-#endif
 #include <assert.h>
 // true dependencies
-#include <algorithm>
 #include "CnvH.h"
 
-CnvH::point operator+(const CnvH::point& A, const CnvH::point& B);
-void sortEdges(std::vector<std::pair<size_t, size_t>>& arr);
+typedef std::pair<size_t, size_t> edge;
+void sortEdges(std::vector<edge>& arr);
 
 CnvH::CnvH(void){
 	state = volume;
@@ -33,13 +30,13 @@ CnvH::CnvH(void){
 CnvH::CnvH(FVector const* arr, int _size) : state(empty){
 	collection.reserve(_size);
 	for (int i = 0; i < _size; i++)
-		add(arr + i, i);
+		add(arr[i], i);
 }
 
-void CnvH::add(FVector const* p_vec, const int _idx) {
-	collection.push_back(p_vec);
-	if (*p_vec == FV_ZERO) return; // Don't change geometry if vector is {0,0,0}
-	FVector extrusion = *p_vec;
+void CnvH::add(FVector _vec, int collectionIdx) {
+	collection.push_back(_vec);
+	if (_vec == FV_ZERO) return; // Don't change geometry if vector is {0,0,0}
+	FVector extrusion = _vec;
 	switch (state) {
 
 	/////////////////////////////////
@@ -49,7 +46,7 @@ void CnvH::add(FVector const* p_vec, const int _idx) {
 		std::cout << "Empty" << std::endl;
 		state = linear;
 		points.push_back(point());
-		points.push_back(point(extrusion, _idx));
+		points.push_back(point(extrusion, collectionIdx));
 	} break;
 
 	/////////////////////////////////
@@ -120,24 +117,24 @@ void CnvH::add(FVector const* p_vec, const int _idx) {
 	case volume: {
 		std::cout << "Volume extrude - " << extrusion << std::endl;
 
-		/* get quads facing the extrusion direction */
-		std::vector<quad> facingQuads;
-		for (const quad& qua : quads) {
+		/* get pointers to quads facing the extrusion direction */
+		std::vector<quad*> facingQuads;
+		for (quad& qua : quads) {
 			if (dot(extrusion, qua.normal) >= 0.0f) {				// if quad IS facing the direction
-				facingQuads.push_back(qua);
+				facingQuads.push_back(&qua);
 			}
 		}
 
 		/* find open edges */
-		std::vector<std::pair<size_t, size_t>> edges;				// TODO: find optimal container for find() and erase()
-		for (const quad& qua : facingQuads) {
+		std::vector<edge> edges;				// TODO: find optimal container for find() and erase()
+		for (const quad* qua : facingQuads) {
 			for (int i = 0; i < 4; i++){
 				int j = (i + 1 < 4) ? j = i + 1 : j = i - 3;
-				std::pair<size_t, size_t> edge = { qua.pointIdx[i], qua.pointIdx[j] };
-				std::pair<size_t, size_t> edge_reverse = { qua.pointIdx[j], qua.pointIdx[i] };
-				auto it_found = std::find(edges.begin(), edges.end(), edge_reverse);
+				edge trueEdge = { qua->pointIdx[i], qua->pointIdx[j] };
+				edge revEdge = { qua->pointIdx[j], qua->pointIdx[i] };
+				auto it_found = std::find(edges.begin(), edges.end(), revEdge);
 				if (it_found == edges.end()){
-					edges.push_back(edge);
+					edges.push_back(trueEdge);
 				}
 				else{
 					edges.erase(it_found);
@@ -145,35 +142,65 @@ void CnvH::add(FVector const* p_vec, const int _idx) {
 			}
 		}
 		sortEdges(edges);
-		bool isEdgeLoop = edges.front.first == edges.back.second;
+		bool isEdgeLoop = edges.front().first == edges.back().second; // Is the edge a closed loop?
 
 		/* make new points and re-bind facing quads to them */
 		for (auto it = edges.begin(); it != edges.end(); ++it) {
 			size_t oldIdx = it->first;
 			size_t newIdx = points.size();
-			it->second = newIdx;
-			point newPoint = points[oldIdx];
+			it->second = newIdx;				// insert in edges
+			point newPoint = points[oldIdx];	// duplicate point
 			points.push_back(newPoint);
-			for (quad& qua : facingQuads)
+			for (quad* qua : facingQuads)		//re-bind quads
 				for (int i = 0; i < 4; i++)
-					if (qua.pointIdx[i] == oldIdx){
-						qua.pointIdx[i] = newIdx;
+					if (qua->pointIdx[i] == oldIdx){
+						qua->pointIdx[i] = newIdx;
 					}
 		}
 
-		/* make edge quads */
-		quads.reserve(quads.size() + edges.size());
-		for (auto it = edges.begin(); it + 1 != edges.end(); ++it){		//ASK: it + 1 != edges.end();
-			size_t
-				p1_idx = it->first,
-				p2_idx = (it + 1)->first,
-				p3_idx = (it + 1)->second,
-				p4_idx = it->second;
-			FVector begVec = points[p1_idx].vec;
-			FVector endVec = points[p2_idx].vec;
-			FVector normal = norm(cross(endVec - begVec, extrusion));
+		/* get pointers to points belonging to quads facing the extrusion direction */
+		std::vector<point*> extrPoints;
+		for (quad* const qua : facingQuads) {
+			for (size_t idx : qua->pointIdx) {
+				point* p_point = &points[idx];
+				auto it_found = std::find(extrPoints.begin(), extrPoints.end(), p_point);
+				if (it_found == extrPoints.end()) {
+					extrPoints.push_back(p_point);		// add pointer only if unique
+				}
+			}
+		}
 
-			quads.push_back(quad{ { p1_idx, p2_idx, p3_idx, p4_idx }, normal });
+		/* make quads along the edge */
+		quads.reserve(quads.size() + edges.size());
+		for (auto it = edges.begin(); next(it) != edges.end(); ++it){		//ASK: it + 1 != edges.end();
+			size_t
+				idx_1 =	it->first,
+				idx_2 = next(it)->first,
+				idx_3 = next(it)->second,
+				idx_4 =	it->second;
+			FVector vec = points[idx_2].vec - points[idx_1].vec;
+			FVector normal = norm(cross(vec, extrusion));
+			quads.push_back(quad{ { idx_1, idx_2, idx_3, idx_4 }, normal });	// !!! invalidates facingQuads
+		}
+		/* make a quad closing the loop */
+		if (isEdgeLoop) {
+			size_t
+				idx_1 = edges.back().first,
+				idx_2 = edges.front().first,
+				idx_3 = edges.front().second,
+				idx_4 = edges.back().second;
+			FVector vec = points[idx_2].vec - points[idx_1].vec;
+			FVector normal = norm(cross(vec, extrusion));
+			quads.push_back(quad{ { idx_1, idx_2, idx_3, idx_4 }, normal });	// !!!! invalidates facingQuads
+		}
+
+		/* move points in the extrusion direction and add weight */
+		for (point* p_point : extrPoints) {
+			p_point->vec += extrusion;
+			auto insResult = p_point->weight.insert({collectionIdx, 1.0f});
+			if (!insResult.second) {		// inserion failed
+				insResult.first->second += 1.0f;
+			}
 		}
 
 	}break;	//end "case volume"
@@ -183,9 +210,9 @@ void CnvH::add(FVector const* p_vec, const int _idx) {
 		break;
 	}
 }
-
-CnvH::point operator+(const CnvH::point& A, const CnvH::point& B) {
-	CnvH::point result;
+/*
+point operator+(const point& A, const point& B) {
+	point result;
 	result.vec = A.vec + B.vec;
 	result.weight.insert(A.weight.begin(), A.weight.end());
 	for (auto it = B.weight.begin(); it != B.weight.end(); ++it) {
@@ -195,8 +222,9 @@ CnvH::point operator+(const CnvH::point& A, const CnvH::point& B) {
 	}
 	return result;
 }
+*/
 
-void sortEdges(std::vector<std::pair<size_t, size_t>>& edgeArray){
+void sortEdges(std::vector<edge>& edgeArray){
 	assert(!edgeArray.empty());
 	for (
 		auto it = edgeArray.begin(), it_next = next(it); it_next != edgeArray.end(); ++it, ++it_next){

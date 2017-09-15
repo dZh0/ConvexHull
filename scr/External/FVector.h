@@ -16,7 +16,7 @@ struct FVector {
 #define FV_ZERO  FVector{ 0.0f, 0.0f, 0.0f }
 
 #ifdef _IOSTREAM_
-std::ostream& operator<<(std::ostream& ostr, const FVector& v) {
+inline std::ostream& operator<<(std::ostream& ostr, const FVector& v) {
 	ostr << "[ " << v.x << ", " << v.y << ", " << v.z << " ]";
 	return ostr;
 }

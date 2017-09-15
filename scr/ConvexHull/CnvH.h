@@ -1,11 +1,10 @@
 // Convex Hull of vector combinations
 
 #pragma once
-//true dependencies
+//true dependancies
 #include <vector>
 #include <map>
 #include "FVector.h"
-
 
 class CnvH {
 public:
@@ -13,7 +12,7 @@ public:
 // Internal structures:
 	enum geometry {empty, linear, planar, volume};
 
-	// Holds a vector and a weight array from collection that constructs it
+	// Holds a vector and a weight map from collection that constructs it
 	struct point {
 		FVector vec;
 		std::map<int,float> weight;
@@ -23,14 +22,13 @@ public:
 		point(FVector _vec, int _idx, float _power = 1.0f) : vec(_vec) { weight[_idx] = _power; }; 
 	};
 	struct quad {
-		// Holds the 4 incidences of points that make up the quad and a normal vector
+		// Holds the 4 indices of points that make up the quad and a normal vector
 		size_t pointIdx[4];
 		FVector normal;
-		inline size_t& operator[] (int x) { return pointIdx[x]; };
 	};
 
 	CnvH();											// Default constructor
-	CnvH(FVector const* arr, const int _size);		// Array constructor
+	CnvH(FVector const* p_arr, const int _size);	// Array constructor
 	void add(FVector const* p_vec, const int idx);
 	
 private:

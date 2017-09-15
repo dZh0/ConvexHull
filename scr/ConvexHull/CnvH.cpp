@@ -1,34 +1,33 @@
-// debug dependancies
+// debug dependencies
 #ifndef _IOSTREAM_
 #include <iostream>
 #endif
 #include <assert.h>
-// true dependancies
+// true dependencies
 #include <algorithm>
-#include <unordered_set>
 #include "CnvH.h"
 
 CnvH::point operator+(const CnvH::point& A, const CnvH::point& B);
+void sortEdges(std::vector<std::pair<size_t, size_t>>& arr);
 
-
-/* TODO: Revert beack default constructor after tests */
-CnvH::CnvH(void) {
+CnvH::CnvH(void){
 	state = volume;
-	point A;	A.vec = { 1.0f,-1.0f,-1.0f };	points.push_back(A);
-	point B;	B.vec = { 1.0f, 1.0f,-1.0f };	points.push_back(B);
-	point C;	C.vec = {-1.0f, 1.0f,-1.0f };	points.push_back(C);
-	point D;	D.vec = {-1.0f,-1.0f,-1.0f };	points.push_back(D);
-	point E;	E.vec = { 1.0f,-1.0f, 1.0f };	points.push_back(E);
-	point F;	F.vec = { 1.0f, 1.0f, 1.0f };	points.push_back(F);
-	point G;	G.vec = {-1.0f, 1.0f, 1.0f };	points.push_back(G);
-	point H;	H.vec = {-1.0f,-1.0f, 1.0f };	points.push_back(H);
+	/* Test cube 2 by 2 by 2 */
+	points.push_back(point({  1.0f, -1.0f, -1.0f }, 0));
+	points.push_back(point({  1.0f,  1.0f, -1.0f }, 1));
+	points.push_back(point({ -1.0f,  1.0f, -1.0f }, 2));
+	points.push_back(point({ -1.0f, -1.0f, -1.0f }, 3));
+	points.push_back(point({  1.0f, -1.0f,  1.0f }, 4));
+	points.push_back(point({  1.0f,  1.0f,  1.0f }, 5));
+	points.push_back(point({ -1.0f,  1.0f,  1.0f }, 6));
+	points.push_back(point({ -1.0f, -1.0f,  1.0f }, 7));
 
-	quad q1 = { { 0, 3, 2, 1 } , { 0.0f, 0.0f,-1.0f } };	quads.push_back(q1);
-	quad q2 = { { 4, 5, 6, 7 } , { 0.0f, 0.0f, 1.0f } };	quads.push_back(q2);
-	quad q3 = { { 2, 3, 7, 6 } , {-1.0f, 0.0f, 0.0f } };	quads.push_back(q3);
-	quad q4 = { { 0, 1, 5, 4 } , { 1.0f, 0.0f, 0.0f } };	quads.push_back(q4);
-	quad q5 = { { 0, 4, 7, 3 } , { 0.0f,-1.0f, 0.0f } };	quads.push_back(q5);
-	quad q6 = { { 1, 2, 6, 5 } , { 0.0f, 1.0f, 0.0f } };	quads.push_back(q6);
+	quads.push_back(quad{{ 0, 3, 2, 1 }, {  0.0f,  0.0f, -1.0f }});
+	quads.push_back(quad{{ 4, 5, 6, 7 }, {  0.0f,  0.0f,  1.0f }});
+	quads.push_back(quad{{ 2, 3, 7, 6 }, { -1.0f,  0.0f,  0.0f }});
+	quads.push_back(quad{{ 0, 1, 5, 4 }, {  1.0f,  0.0f,  0.0f }});
+	quads.push_back(quad{{ 0, 4, 7, 3 }, {  0.0f, -1.0f,  0.0f }});
+	quads.push_back(quad{{ 1, 2, 6, 5 }, {  0.0f,  1.0f,  0.0f }});
 }
 
 CnvH::CnvH(FVector const* arr, int _size) : state(empty){
@@ -37,10 +36,10 @@ CnvH::CnvH(FVector const* arr, int _size) : state(empty){
 		add(arr + i, i);
 }
 
-void CnvH::add(FVector const* p_vec, const int idx) {
+void CnvH::add(FVector const* p_vec, const int _idx) {
 	collection.push_back(p_vec);
-	if (*p_vec == FV_ZERO) return; // Dont change geometry if vector is {0,0,0}
-	point newPnt(*p_vec, idx);
+	if (*p_vec == FV_ZERO) return; // Don't change geometry if vector is {0,0,0}
+	FVector extrusion = *p_vec;
 	switch (state) {
 
 	/////////////////////////////////
@@ -48,11 +47,9 @@ void CnvH::add(FVector const* p_vec, const int idx) {
 	/////////////////////////////////
 	case empty: {
 		std::cout << "Empty" << std::endl;
-/*
 		state = linear;
 		points.push_back(point());
-		points.push_back(newPnt);
-*/
+		points.push_back(point(extrusion, _idx));
 	} break;
 
 	/////////////////////////////////
@@ -62,11 +59,11 @@ void CnvH::add(FVector const* p_vec, const int idx) {
 		std::cout << "Linear" << std::endl;
 /*
 		auto it = points.rbegin();
-		if (isColinear(newPnt.vec, it->vec)) {						// if new point IS on the same line
+		if (isColinear(extrusion, it->vec)) {						// if new point IS on the same line
 			auto it_selected = it;
-			float direction = dot(newPnt.vec, it_selected->vec);
+			float direction = dot(extrusion, it_selected->vec);
 			while (it < points.rend()){
-				float newDirection = dot(newPnt.vec, it->vec);
+				float newDirection = dot(extrusion, it->vec);
 				if (newDirection > direction){
 					direction = newDirection;
 					it_selected = it;
@@ -94,7 +91,7 @@ void CnvH::add(FVector const* p_vec, const int idx) {
 		if (cross(newPnt.vec, quads[0].normal) == FV_ZERO) {	// if new point IS in the same plane
 			state = volume;
 			// TODO: Select edge
-			// TODO: Clone verecies
+			// TODO: Clone vertices
 			// TODO: Build quads
 			// TODO: Move
 		}
@@ -110,7 +107,7 @@ void CnvH::add(FVector const* p_vec, const int idx) {
 
 			// TODO: Flip Normals
 			// TODO: Select edge
-			// TODO: Clone verecies
+			// TODO: Clone vertices
 			// TODO: Build quads
 			// TODO: Move
 		}
@@ -121,145 +118,72 @@ void CnvH::add(FVector const* p_vec, const int idx) {
 	// Convex Hull is a 3D volume: //
 	/////////////////////////////////
 	case volume: {
-		std::cout << "Volume extrude - " << newPnt.vec << std::endl;
+		std::cout << "Volume extrude - " << extrusion << std::endl;
 
-		// split quads and point ids in facing and non-facing containers based on the quads' normal and the given point newPnt
-
+		/* get quads facing the extrusion direction */
 		std::vector<quad> facingQuads;
-		std::unordered_set<size_t> facingPoints;
-
-		std::vector<quad> nonFacingQuads;
-		std::unordered_set<size_t> nonFacingPoints;
-
 		for (const quad& qua : quads) {
-			std::vector<quad> *p_quads;
-			std::unordered_set<size_t> *p_points;
-			// if quad IS facing the direction: Select facing quad and point id containers
-			if (dot(newPnt.vec, qua.normal) >= 0.0f) {
-				p_quads = &facingQuads;
-				p_points = &facingPoints;
+			if (dot(extrusion, qua.normal) >= 0.0f) {				// if quad IS facing the direction
+				facingQuads.push_back(qua);
 			}
-			// if quad is NOT facing the direction: Select non-facing quad and point id containers
-			else {
-				p_quads = &nonFacingQuads;
-				p_points = &nonFacingPoints;
-			}
-			// fill selected containers
-			p_quads->push_back(qua);
-			for (const size_t& i : qua.pointIdx)
-				p_points->insert(i);
 		}
 
-		// create edge point and move point containers from facing and non-facing points
-
-		std::unordered_set<size_t>& movePoints = facingPoints;		// ids of points which will be MOVED during extrusion
-		std::unordered_set<size_t>& edgePoints = nonFacingPoints;	// ids of points which will be CLONED during extrusion
-
-		/* if point id is ONLY in edge container: Remove point id from edge container */
-		for (auto it_edge = edgePoints.begin(); it_edge != edgePoints.end();) {
-			if (movePoints.find(*it_edge) == movePoints.end()) it_edge = edgePoints.erase(it_edge);
-			else ++it_edge;
-		}
-
-		/* if point id is in edge container: Remove point id from move container */
-		for (auto it_move = movePoints.begin(); it_move != movePoints.end();) {
-			if (edgePoints.find(*it_move) != edgePoints.end()) it_move = movePoints.erase(it_move);
-			else ++it_move;
-		}
-
-		/* order the edge point in a loop container so each point MUST share a quad with the next point in the container */
-
-		std::unordered_set<size_t> edgeLoop;
-		assert(!edgePoints.empty());
-		size_t loopPoint = *edgePoints.begin();
-
-		while (edgeLoop.size() < edgePoints.size()) {
-			for (const quad& qua : facingQuads){
-				for (int i = 0; i < 4; i++){
-					if (qua.pointIdx[i] == loopPoint) {
-						size_t nextIdx = (i + 1 < 4) ? i + 1 : i - 3;
-						while (edgePoints.find(qua.pointIdx[nextIdx]) != edgePoints.end()) {
-							loopPoint = qua.pointIdx[nextIdx];
-							edgeLoop.insert(loopPoint);
-							nextIdx = (nextIdx + 1 < 4) ? nextIdx + 1 : nextIdx - 3;
-						}
-					}
+		/* find open edges */
+		std::vector<std::pair<size_t, size_t>> edges;				// TODO: find optimal container for find() and erase()
+		for (const quad& qua : facingQuads) {
+			for (int i = 0; i < 4; i++){
+				int j = (i + 1 < 4) ? j = i + 1 : j = i - 3;
+				std::pair<size_t, size_t> edge = { qua.pointIdx[i], qua.pointIdx[j] };
+				std::pair<size_t, size_t> edge_reverse = { qua.pointIdx[j], qua.pointIdx[i] };
+				auto it_found = std::find(edges.begin(), edges.end(), edge_reverse);
+				if (it_found == edges.end()){
+					edges.push_back(edge);
+				}
+				else{
+					edges.erase(it_found);
 				}
 			}
 		}
+		sortEdges(edges);
+		bool isEdgeLoop = edges.front.first == edges.back.second;
 
-		/* create extrusion points */
-
-		std::unordered_set<size_t> newEdgeLoop;
-		for (auto it_edge = edgeLoop.begin(); it_edge != edgeLoop.end(); ++it_edge) {
-			size_t edgeIdx = *it_edge;
+		/* make new points and re-bind facing quads to them */
+		for (auto it = edges.begin(); it != edges.end(); ++it) {
+			size_t oldIdx = it->first;
 			size_t newIdx = points.size();
-			point pnt = points[edgeIdx];
-
-			/* duplicate point and add its index to the new edge loop and the move container */
-			points.push_back(pnt);
-			movePoints.insert(newIdx);
-			newEdgeLoop.insert(newIdx);
-
-			/* rebind facing quads' edge points to the new edge loop */
+			it->second = newIdx;
+			point newPoint = points[oldIdx];
+			points.push_back(newPoint);
 			for (quad& qua : facingQuads)
 				for (int i = 0; i < 4; i++)
-					if (qua.pointIdx[i] == edgeIdx) qua.pointIdx[i] = newIdx;
+					if (qua.pointIdx[i] == oldIdx){
+						qua.pointIdx[i] = newIdx;
+					}
 		}
 
-		/* create edge quads from the old and the new edge points */
+		/* make edge quads */
+		quads.reserve(quads.size() + edges.size());
+		for (auto it = edges.begin(); it + 1 != edges.end(); ++it){		//ASK: it + 1 != edges.end();
+			size_t
+				p1_idx = it->first,
+				p2_idx = (it + 1)->first,
+				p3_idx = (it + 1)->second,
+				p4_idx = it->second;
+			FVector begVec = points[p1_idx].vec;
+			FVector endVec = points[p2_idx].vec;
+			FVector normal = norm(cross(endVec - begVec, extrusion));
 
-		std::vector<quad> edgeQuads;
-		edgeQuads.reserve(edgeLoop.size());
-
-		// 4 point iterators
-		auto it_0 = edgeLoop.begin();			// newEdgeLoop	----- it_3 <-- it_2 -----
-		auto it_1 = std::next(it_0);			//				        |        ^
-		auto it_3 = newEdgeLoop.begin();		//				        v        |
-		auto it_2 = std::next(it_3);			// edgeLoop		----- it_0 --> it_1 -----
-
-		while (it_0 != edgeLoop.end() && it_3 != newEdgeLoop.end()) {
-			// TODO normals are undefined as both points are on the same spot
-			FVector A = points[*it_1].vec - points[*it_0].vec;
-			FVector B = points[*it_2].vec - points[*it_0].vec;
-			FVector normal = norm(cross(A, B));
-			quad qua = { { *it_0, *it_1, *it_2, *it_3 }, normal };
-			edgeQuads.push_back(qua);
-			{ // next iterators
-				++it_0;
-				++it_1;
-				++it_3;
-				++it_2;
-				if (it_1 == edgeLoop.end() || it_2 == newEdgeLoop.end()) {
-					it_1 = edgeLoop.begin();
-					it_2 = newEdgeLoop.begin();
-				}
-			}
+			quads.push_back(quad{ { p1_idx, p2_idx, p3_idx, p4_idx }, normal });
 		}
-
-		// Replace CnvH.quads container
-
-		quads.clear();
-		quads.reserve(facingQuads.size() + nonFacingQuads.size() + edgeQuads.size());
-		quads.insert(quads.end(),	facingQuads.begin(),	facingQuads.end());
-		quads.insert(quads.end(),	nonFacingQuads.begin(),	nonFacingQuads.end());
-		quads.insert(quads.end(),	edgeQuads.begin(),		edgeQuads.end());
-
-		// Move the points in move container based on newPnt
-
-		for (auto it_mov = movePoints.begin(); it_mov != movePoints.end(); ++it_mov)
-			points[*it_mov] = points[*it_mov] + newPnt;
 
 	}break;	//end "case volume"
+
 	default:
 		assert("Convex Hull state not properly defined!");
 		break;
 	}
 }
 
-/////////////////////////////////
-// Point operations
-/////////////////////////////////
 CnvH::point operator+(const CnvH::point& A, const CnvH::point& B) {
 	CnvH::point result;
 	result.vec = A.vec + B.vec;
@@ -270,4 +194,19 @@ CnvH::point operator+(const CnvH::point& A, const CnvH::point& B) {
 			insert.first->second += it->second;
 	}
 	return result;
+}
+
+void sortEdges(std::vector<std::pair<size_t, size_t>>& edgeArray){
+	assert(!edgeArray.empty());
+	for (
+		auto it = edgeArray.begin(), it_next = next(it); it_next != edgeArray.end(); ++it, ++it_next){
+		if (it->second != it_next->first){
+			for (auto it_seek = next(it_next); it_seek != edgeArray.end(); ++it_seek){
+				if (it->second == it_seek->first){
+					std::iter_swap(it_next, it_seek);
+					break;
+				}
+			}
+		}	
+	}
 }

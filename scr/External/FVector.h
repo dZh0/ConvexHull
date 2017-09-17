@@ -31,13 +31,16 @@ inline FVector operator*(const float& A, const FVector& B){
 }
 
 inline FVector operator+(const FVector& A, const FVector& B){
-	return FVector{ A.x+B.x, A.y+B.y, A.x+B.y };}
+	return FVector{ A.x + B.x, A.y + B.y, A.z + B.z };
+}
 
 inline FVector operator-(const FVector& A, const FVector& B){
-	return FVector{ A.x - B.x, A.y - B.y, A.x - A.y };}
+	return FVector{ A.x - B.x, A.y - B.y, A.z - B.z };
+};
 
 inline float dot(const FVector& A, const FVector& B){
-	return A.x*B.x + A.y*B.y + A.z*B.z;}
+	return A.x*B.x + A.y*B.y + A.z*B.z;
+};
 
 inline FVector cross(const FVector& A, const FVector& B){
 	return FVector{ A.y*B.z - A.z*B.y, A.z*B.x - A.x*B.z, A.x*B.y - A.y*B.x };
@@ -45,18 +48,18 @@ inline FVector cross(const FVector& A, const FVector& B){
 
 inline FVector norm(const FVector& A){
 	float length = sqrt(A.x*A.x + A.y*A.y + A.z*A.z);
+	if (length == 0.0f) return FV_ZERO;
 	return FVector{ A.x / length, A.y / length, A.z / length };
 }
 
 inline bool operator==(const FVector& A, const FVector& B){
 	if (&A == &B) return true;
-	return  A.x == B.x && A.y == B.y && A.x == A.y;
+	return  A.x == B.x && A.y == B.y && A.z == B.z;
 }
 inline bool operator!=(const FVector& A, const FVector& B){
 	if (&A == &B) return false;
-	return  A.x != B.x || A.y != B.y || A.x != A.y;
+	return  A.x != B.x || A.y != B.y || A.z != B.z;
 }
-
 inline bool isOrthogonal(const FVector& A, const FVector& B){
 	if (&A == &B) return false;
 	return A.x*B.x + A.y*B.y + A.z*B.z == 0.0f;

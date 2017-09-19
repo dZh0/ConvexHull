@@ -3,6 +3,7 @@
 
 //true dependancies
 #include <vector>
+#include <list>
 #include <map>
 #include "FVector.h"
 
@@ -38,11 +39,11 @@ private:
 		size_t endIdx;
 	};
 
-	std::vector<edge>
-	FindOpenEdges(const std::vector<quad*>& quadArray);
+	std::list<edge>
+	FindOpenEdges(const std::list<quad*>& quadArr);
 
-	void
-	SortEdges(std::vector<edge>& edgeArray);
+	std::list<size_t>
+	SortEdges(std::list<edge>& edgeArr);
 
 	quad
 	BuildQuad(edge e1, edge e2, FVector dist);

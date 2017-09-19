@@ -38,7 +38,7 @@ int main() {
 		std::cout << "Enter extrusion vector: ";
 		std::cin >> A >> B >> C;
 		vec = { A, B, C };
-		CH_empty.add(vec, idx);
+		CH_empty.Add(vec, idx);
 		idx++;
 	} while (vec != FV_ZERO);
     return 0;

@@ -9,8 +9,9 @@
 class CnvH {
 public:
 	CnvH();											// Default constructor
-	CnvH(FVector const* p_arr, const int _size);	// Array constructor
-	void add(FVector const _vec, const int collectionIdx);
+	CnvH(FVector const* p_arr, int _size);			// Array constructor
+
+	void Add(FVector extrusion, int collectionIdx);
 
 private:
 	enum geometry { empty, linear, planar, volume };
@@ -22,22 +23,30 @@ private:
 		FVector vec;
 		std::map<int, float> weight;
 
-		//constructors
 		point() : vec(FV_ZERO) {};
-		point(FVector _vec, int _idx, float _power = 1.0f) : vec(_vec) { weight[_idx] = _power; };
 	};
-	std::vector<point> points;			// Points of the Convex Hull (INDEXED CONTAINER!)
+	std::vector<point> hullPoints;			// Points of the Convex Hull (MUST BE INDEXED CONTAINER!)
 
 	struct quad {
 		size_t pointIdx[4];
 		FVector normal;
 	};
-	std::vector<quad> quads;			// Quads of the Convex Hull
+	std::vector<quad> hullQuads;			// Quads of the Convex Hull
 
-	typedef std::pair<size_t, size_t> edge;
+	struct edge{
+		size_t startIdx;
+		size_t endIdx;
+	};
 
-	std::vector<edge> findOpenEdges(const std::vector<quad*>& quadArray);
-	void sortEdges(std::vector<edge>& edgeArray);
-	quad buildQuad(edge e1, edge e2, FVector dist);
-	quad flipQuad(const quad& q);
+	std::vector<edge>
+	FindOpenEdges(const std::vector<quad*>& quadArray);
+
+	void
+	SortEdges(std::vector<edge>& edgeArray);
+
+	quad
+	BuildQuad(edge e1, edge e2, FVector dist);
+
+	quad
+	FlipQuad(const quad& q);
 };

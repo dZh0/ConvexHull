@@ -105,6 +105,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 
 			// Clone the points from edge_1 to edge 2 and mark them for move
 			std::list<size_t> edge_2;
+			moveIdx.reserve(edge_2.size());
 			for (size_t i : edge_1) {
 				edge_2.push_back(newIdx);
 				newPoints.push(hullPoints[i]);
@@ -144,7 +145,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 			// Delete edges that are not facing the extrusion direction (no longer loop)
 			FVector direction = cross(extrusion, hullNormal);
 			for (auto it = edge_1.begin(); it != edge_1.end();) {
-				FVector edgeVec = hullPoints[it->endIdx].vec - hullPoints[it->startIdx].vec;
+				FVector edgeVec = hullPoints[it->pointIdx[1]].vec - hullPoints[it->pointIdx[0]].vec;
 				if (dot(edgeVec, direction) <= 0.0f) {
 					it = edge_1.erase(it);
 				}
@@ -154,10 +155,24 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 			}
 
 			// Clone the points from edge_1 to edge 2 and mark them for move
-			std::map<size_t,size_t> indexMap; // Keeps map of indecies from edge_1 to edge_2
 			std::list<edge> edge_2;
+			moveIdx.reserve(edge_2.size() + 1);
+			std::map<size_t, size_t> indexMap; // Keeps map of indecies from edge_1 to edge_2
 			for (const edge& e : edge_1) {
-
+				size_t e2[2];
+				for (int i = 0; i < 2; i++) {
+					auto insResult = indexMap.insert({ e.pointIdx[i],newIdx });
+					if (insResult.second) {
+						e2[i] = newIdx;
+						newPoints.push(hullPoints[e.pointIdx[i]]);
+						moveIdx.insert(newIdx);
+						newIdx++;
+					}
+					else {
+						e2[i] = insResult.first->first;
+					}
+					edge_2.push_back(edge{ e2[0], e2[1] });
+				}
 			}
 
 			// Build quads betwean edge_1 and edge_2
@@ -170,11 +185,14 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 			state = volume;
 			std::cout << "Plane to volume extrude - " << extrusion << std::endl;
 
-			// Build edge_2 edge with new point indecies
-			std::vector<edge> edge_2 = edge_1;
+			// As the whole hull will be cloned all new points have index = old_index + index_offset 
+			const size_t indexOffset = newIdx;
+			
+			// Build edge_2 edge with new incremented point indecies
+			std::list<edge> edge_2 = edge_1;
 			for (edge& e : edge_2) {
-				e.startIdx += newIdx;
-				e.endIdx += newIdx;
+				e.pointIdx[0] += indexOffset;
+				e.pointIdx[1] += indexOffset;
 			}
 
 			// Clone all points and mark them for moving
@@ -192,7 +210,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 				if (isFacing) { q = FlipQuad(q); }	// Flip the original quad
 				else { newQ = FlipQuad(newQ);	}	// Flip the new quad
 				for (int i = 0; i < 4; i++) {
-					newQ.pointIdx[i] += newIdx;
+					newQ.pointIdx[i] += indexOffset;
 				}
 				newQuads.push(newQ);
 			}
@@ -211,7 +229,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 		std::cout << "Volume extrude - " << extrusion << std::endl;
 
 		//Select quads facing the extrusion direction
-		std::vector<quad*> selectQuads;
+		std::list<quad*> selectQuads;
 		for (quad& q : hullQuads) {
 			if (dot(extrusion, q.normal) >= 0.0f) {	// if quad IS facing the direction
 				selectQuads.push_back(&q);
@@ -219,35 +237,43 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 		}
 
 		// Find open edges:
-		std::vector<edge> edge_1 = FindOpenEdges(selectQuads);
+		std::list<edge> edge_1 = FindOpenEdges(selectQuads);
 
-		// Build edge_2 edge with new point indecies
-		std::vector<edge> edge_2 = edge_1;
-		for (edge& e : edge_2) {
-			e.startIdx += newIdx;
-			e.endIdx += newIdx;
+		// Clone the points from edge_1 to edge 2
+		std::list<edge> edge_2;
+		std::map<size_t, size_t> indexMap; // Keeps map of indecies from edge_1 to edge_2
+		for (const edge& e : edge_1) {
+			size_t e2[2];
+			for (int i = 0; i < 2; i++) {
+				auto insResult = indexMap.insert({ e.pointIdx[i],newIdx });
+				if (insResult.second) {
+					e2[i] = newIdx;
+					newPoints.push(hullPoints[e.pointIdx[i]]);
+					newIdx++;
+				}
+				else {
+					e2[i] = insResult.first->first;
+				}
+				edge_2.push_back(edge{ e2[0], e2[1] });
+			}
 		}
+
+		// Re-bind selectQuads quads to edge_2 and mark all for move
+		for (quad* ptr_q : selectQuads) {
+			for (int i = 0; i < 4; i++) {
+				auto it_found = indexMap.find(i);
+				if (it_found != indexMap.end()) {
+					ptr_q->pointIdx[i] = it_found->second;
+				}
+				moveIdx.insert(ptr_q->pointIdx[i]);
+			}
+		}
+
 
 		// Build quads betwean edge_1 and edge_2
-		for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); it_1 != edge_1.end(); ++it_1, ++it_2) {
+		for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); it_1 != edge_1.end(); ++it_1, ++it_2) {		//ASK: it + 1 != edges.end();
 			newQuads.push(BuildQuad(*it_1, *it_2, extrusion));
 		}
-
-		// make new points and re-bind facing quads to them
-		for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); it_1 != edge_1.end(); ++it_1, ++it_2) {
-			newQuads.push(BuildQuad(*it_1, *it_2, extrusion));
-			size_t oldIdx = it_1->startIdx;
-			point newPnt = hullPoints[oldIdx];		// duplicate point
-			hullPoints.push_back(newPnt);
-			for (quad* ptr_q : selectQuads) {		//re-bind quads
-				for (int i = 0; i < 4; i++)
-					if (ptr_q->pointIdx[i] == oldIdx) {
-						ptr_q->pointIdx[i] = newIdx;
-					}
-			}
-			newIdx++;
-		}
-
 	}break;	//end "case volume"
 
 	default:
@@ -264,6 +290,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 	hullQuads.reserve(hullQuads.size() + newQuads.size());
 	while (!newQuads.empty()) {
 		hullQuads.push_back(newQuads.front());
+		newQuads.pop();
 	}
 	// Move points
 	if (!moveIdx.empty()) {
@@ -276,7 +303,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 		}
 	}
 }
-/*
+
 // Finds the open edges in selection of quads.
 std::list<CnvH::edge> CnvH::FindOpenEdges(const std::list<quad*>& quadArray) {
 	std::list<edge> openEdges;				// TODO: find optimal container for find() and erase()
@@ -296,76 +323,15 @@ std::list<CnvH::edge> CnvH::FindOpenEdges(const std::list<quad*>& quadArray) {
 	}
 	return openEdges;
 }
-*/
-// Finds the open edges in selection of quads.
-std::list<CnvH::edge> CnvH::FindOpenEdges(const std::list<quad*>& quadArr) {
-	std::list<edge> openEdges;				// TODO: find optimal container for find() and erase()
-	for (const quad* ptr_q : quadArr) {
-		for (int i = 0; i < 4; i++) {
-			int j = (i < 3) ? j = i + 1 : j = i - 3;
-			edge trueEdge = { ptr_q->pointIdx[i], ptr_q->pointIdx[j] };
-			edge revEdge = { ptr_q->pointIdx[j], ptr_q->pointIdx[i] };
-			auto it_found = std::find(openEdges.begin(), openEdges.end(), revEdge);
-			if (it_found == openEdges.end()) {
-				openEdges.push_back(trueEdge);
-			}
-			else {
-				openEdges.erase(it_found);
-			}
-		}
-	}
-	return openEdges;
-}
-
-// Sorts a list of edges and returns an ordered list of indices
-std::list<size_t> CnvH::SortEdges(std::list<edge>& edgeArr) {
-	// Find the first edge 
-	// startIdx of the edge must not be endIdx of any other edge)
-	bool isFound = true;
-	auto it_first = edgeArr.begin();
-	while (it_first != edgeArr.end() && isFound) {
-		isFound = false;
-		auto it_seek = edgeArr.begin();
-		while (it_seek != edgeArr.end() && !isFound) {
-			if (it_seek->endIdx == it_first->startIdx) {
-				isFound = true;
-			}
-			++it_seek;
-		}
-	}
-	// Sort the rest of the edges and fill the list of indexes
-	if (it_first != edgeArr.begin() && it_first != edgeArr.end()) {
-		std::iter_swap(edgeArr.begin(), it_first);
-	}
-	auto it_sorted = edgeArr.begin();
-	std::list<size_t> idxList;
-	idxList.push_back(it_sorted->startIdx);
-	idxList.push_back(it_sorted->endIdx);
-	while (it_sorted != prev(edgeArr.end())) {
-		auto it_seek = next(it_sorted);
-		while (it_sorted->endIdx != it_seek->startIdx) {
-			++it_seek;
-		}
-		idxList.push_back(it_seek->endIdx);
-		if (it_seek != next(it_sorted)) {
-			std::iter_swap(next(it_sorted), it_seek);
-		}
-		++it_sorted;
-	}
-	if (edgeArr.front().startIdx == edgeArr.back().endIdx) { //If the loop is closed
-		idxList.push_back(edgeArr.front().startIdx);
-	}
-	return idxList;
-}
 
 // Builds a quad between 2 edges
 CnvH::quad CnvH::BuildQuad(	edge e1, edge e2, FVector dist )
 {
 	size_t idx[4] = {
-		e1.startIdx,
-		e1.endIdx,
-		e2.endIdx,
-		e2.startIdx
+		e1.pointIdx[1],
+		e1.pointIdx[0],
+		e2.pointIdx[0],
+		e2.pointIdx[1]
 	};
 	FVector vec = hullPoints[idx[1]].vec - hullPoints[idx[0]].vec;
 	FVector normal = norm(cross(vec, dist));

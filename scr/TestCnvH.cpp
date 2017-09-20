@@ -2,6 +2,8 @@
 
 //debug depenancies
 #include <iostream>
+#include <fstream>
+#include <assert.h>
 //dummy depenancies
 #include "FVector.h"		// Simple float Vector 3D implementation
 #include "AThruster.h"		// Dummy spaceship thruster implementation
@@ -29,7 +31,11 @@ const AThruster engines[DATA_SIZE] = {
 };
 //end UNIT TEST DATA
 
+
+
 int main() {
+	std::ifstream inputFile;
+	inputFile.open("../Input/inputTest_1.txt");
 	CnvH CH_empty;
 	int idx = 0;
 	float A, B, C;
@@ -41,5 +47,6 @@ int main() {
 		CH_empty.Add(vec, idx);
 		idx++;
 	} while (vec != FV_ZERO);
+	inputFile.close();
     return 0;
 }

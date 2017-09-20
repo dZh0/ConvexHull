@@ -35,19 +35,13 @@ private:
 	std::vector<quad> hullQuads;			// Quads of the Convex Hull
 
 	struct edge{
-		size_t startIdx;
-		size_t endIdx;
+		size_t pointIdx[2];
+		inline bool operator==(const CnvH::edge& A) { //WTF!?
+			return  A.pointIdx[0] == pointIdx[0] && A.pointIdx[1] == pointIdx[1];
+		}
 	};
 
-	std::list<edge>
-	FindOpenEdges(const std::list<quad*>& quadArr);
-
-	std::list<size_t>
-	SortEdges(std::list<edge>& edgeArr);
-
-	quad
-	BuildQuad(edge e1, edge e2, FVector dist);
-
-	quad
-	FlipQuad(const quad& q);
+	std::list<edge> FindOpenEdges(const std::list<quad*>& quadArr);
+	quad BuildQuad(edge e1, edge e2, FVector dist);
+	quad FlipQuad(const quad& q);
 };

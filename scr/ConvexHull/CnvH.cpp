@@ -51,7 +51,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 	//    Convex Hull is empty:    //
 	/////////////////////////////////
 	case empty: {
-		std::cout << "Empty" << std::endl;
+		std::cout << "Add first point - " << extrusion << std::endl;
 		state = linear;
 		newPoints.emplace();
 		newIdx++;
@@ -97,8 +97,9 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 			for (size_t i = 1; i < hullPoints.size(); i++){
 				float iProj = dot(hullPoints[i].vec, hullLine);
 				auto it = edge_1.begin();
-				while (iProj < dot(hullPoints[*it].vec, hullLine) && it != edge_1.end()){
+				while (iProj < dot(hullPoints[*it].vec, hullLine)){
 					++it;
+					if (it == edge_1.end()) break;
 				}
 				edge_1.insert(it, i);
 			}
@@ -117,7 +118,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 			for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); next(it_1) != edge_1.end(); ++it_1, ++it_2) {
 				FVector edgeVec = hullPoints[*next(it_1)].vec - hullPoints[*it_1].vec;
 				FVector normal = norm(cross(edgeVec, extrusion));
-				newQuads.push(quad{ *it_1, *next(it_1), *next(it_2), *it_2, normal });
+				newQuads.push(quad{ { *it_1, *next(it_1), *next(it_2), *it_2 }, normal });
 			}
 			
 		}
@@ -159,20 +160,20 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 			moveIdx.reserve(edge_2.size() + 1);
 			std::map<size_t, size_t> indexMap; // Keeps map of indecies from edge_1 to edge_2
 			for (const edge& e : edge_1) {
-				size_t e2[2];
+				edge e2;
 				for (int i = 0; i < 2; i++) {
 					auto insResult = indexMap.insert({ e.pointIdx[i],newIdx });
 					if (insResult.second) {
-						e2[i] = newIdx;
+						e2.pointIdx[i] = newIdx;
 						newPoints.push(hullPoints[e.pointIdx[i]]);
 						moveIdx.insert(newIdx);
 						newIdx++;
 					}
 					else {
-						e2[i] = insResult.first->first;
+						e2.pointIdx[i] = insResult.first->first;
 					}
-					edge_2.push_back(edge{ e2[0], e2[1] });
 				}
+				edge_2.push_back(e2);
 			}
 
 			// Build quads betwean edge_1 and edge_2
@@ -243,18 +244,18 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 		std::list<edge> edge_2;
 		std::map<size_t, size_t> indexMap; // Keeps map of indecies from edge_1 to edge_2
 		for (const edge& e : edge_1) {
-			size_t e2[2];
+			edge e2;
 			for (int i = 0; i < 2; i++) {
 				auto insResult = indexMap.insert({ e.pointIdx[i],newIdx });
 				if (insResult.second) {
-					e2[i] = newIdx;
+					e2.pointIdx[i] = newIdx;
 					newPoints.push(hullPoints[e.pointIdx[i]]);
 					newIdx++;
 				}
 				else {
-					e2[i] = insResult.first->first;
+					e2.pointIdx[i] = insResult.first->first;
 				}
-				edge_2.push_back(edge{ e2[0], e2[1] });
+				edge_2.push_back(e2);
 			}
 		}
 
@@ -271,7 +272,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 
 
 		// Build quads betwean edge_1 and edge_2
-		for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); it_1 != edge_1.end(); ++it_1, ++it_2) {		//ASK: it + 1 != edges.end();
+		for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); it_1 != edge_1.end(); ++it_1, ++it_2) {
 			newQuads.push(BuildQuad(*it_1, *it_2, extrusion));
 		}
 	}break;	//end "case volume"
@@ -348,4 +349,9 @@ CnvH::quad CnvH::FlipQuad(const quad& q) {
 	};
 	FVector normal = q.normal * -1.0f;
 	return quad{ { idx[0], idx[1], idx[2], idx[3] }, normal };
+}
+
+bool operator==(const CnvH::edge& A, const CnvH::edge& B) {
+	if (&A == &B) return true;
+	return  A.pointIdx[0] == B.pointIdx[0] && A.pointIdx[1] == B.pointIdx[1];
 }

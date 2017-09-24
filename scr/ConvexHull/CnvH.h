@@ -9,10 +9,10 @@
 
 class CnvH {
 public:
-	CnvH();											// Default constructor
+	CnvH() :state(empty) {};						// Default constructor
 	CnvH(FVector const* p_arr, int _size);			// Array constructor
 
-	void Add(FVector extrusion, int collectionIdx);
+	void Add(FVector extrusion);
 
 private:
 	enum geometry { empty, linear, planar, volume };

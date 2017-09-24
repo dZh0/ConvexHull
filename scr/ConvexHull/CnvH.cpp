@@ -6,38 +6,17 @@
 // true dependencies
 #include "CnvH.h"
 
-CnvH::CnvH(void) {
-	state = empty;
-}
-/*
-CnvH::CnvH(void){
-	state = volume;
-	// Test cube 2 by 2 by 2
-	hullPoints.push_back(point({  1.0f, -1.0f, -1.0f }, 0));
-	hullPoints.push_back(point({  1.0f,  1.0f, -1.0f }, 1));
-	hullPoints.push_back(point({ -1.0f,  1.0f, -1.0f }, 2));
-	hullPoints.push_back(point({ -1.0f, -1.0f, -1.0f }, 3));
-	hullPoints.push_back(point({  1.0f, -1.0f,  1.0f }, 4));
-	hullPoints.push_back(point({  1.0f,  1.0f,  1.0f }, 5));
-	hullPoints.push_back(point({ -1.0f,  1.0f,  1.0f }, 6));
-	hullPoints.push_back(point({ -1.0f, -1.0f,  1.0f }, 7));
-
-	hullQuads.push_back(quad{{ 0, 3, 2, 1 }, {  0.0f,  0.0f, -1.0f }});
-	hullQuads.push_back(quad{{ 4, 5, 6, 7 }, {  0.0f,  0.0f,  1.0f }});
-	hullQuads.push_back(quad{{ 2, 3, 7, 6 }, { -1.0f,  0.0f,  0.0f }});
-	hullQuads.push_back(quad{{ 0, 1, 5, 4 }, {  1.0f,  0.0f,  0.0f }});
-	hullQuads.push_back(quad{{ 0, 4, 7, 3 }, {  0.0f, -1.0f,  0.0f }});
-	hullQuads.push_back(quad{{ 1, 2, 6, 5 }, {  0.0f,  1.0f,  0.0f }});
-}
-*/
+// Creates CnvH from C-style FVector array.
 CnvH::CnvH(FVector const* p_arr, int _size) : state(empty){
 	collection.reserve(_size);
 	for (int i = 0; i < _size; i++) {
-		Add(p_arr[i], i);
+		Add(p_arr[i]);
 	}
 }
 
-void CnvH::Add(FVector extrusion, int collectionIdx) {
+// Adds a FVector to the hull.
+void CnvH::Add(FVector extrusion) {
+	const size_t collectionIdx = collection.size();
 	collection.push_back(extrusion);
 	if (extrusion == FV_ZERO) return;		// Don't change geometry if vector is {0,0,0}
 	
@@ -106,7 +85,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 
 			// Clone the points from edge_1 to edge 2 and mark them for move
 			std::list<size_t> edge_2;
-			moveIdx.reserve(edge_2.size());
+			moveIdx.reserve(edge_1.size());
 			for (size_t i : edge_1) {
 				edge_2.push_back(newIdx);
 				newPoints.push(hullPoints[i]);
@@ -144,7 +123,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 			std::cout << "Planar extrude - " << extrusion << std::endl;
 
 			// Delete edges that are not facing the extrusion direction (no longer loop)
-			FVector direction = cross(extrusion, hullNormal);
+			FVector direction = cross(hullNormal, extrusion);
 			for (auto it = edge_1.begin(); it != edge_1.end();) {
 				FVector edgeVec = hullPoints[it->pointIdx[1]].vec - hullPoints[it->pointIdx[0]].vec;
 				if (dot(edgeVec, direction) <= 0.0f) {
@@ -157,7 +136,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 
 			// Clone the points from edge_1 to edge 2 and mark them for move
 			std::list<edge> edge_2;
-			moveIdx.reserve(edge_2.size() + 1);
+			moveIdx.reserve(edge_1.size() + 1);
 			std::map<size_t, size_t> indexMap; // Keeps map of indecies from edge_1 to edge_2
 			for (const edge& e : edge_1) {
 				edge e2;
@@ -170,7 +149,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 						newIdx++;
 					}
 					else {
-						e2.pointIdx[i] = insResult.first->first;
+						e2.pointIdx[i] = insResult.first->second;
 					}
 				}
 				edge_2.push_back(e2);
@@ -178,7 +157,8 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 
 			// Build quads betwean edge_1 and edge_2
 			for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); it_1 != edge_1.end(); ++it_1, ++it_2) {
-				newQuads.push(BuildQuad(*it_1, *it_2, extrusion));
+				quad q = BuildQuad(*it_1, *it_2, extrusion);
+				newQuads.push(FlipQuad(q));
 			}
 
 		}
@@ -218,10 +198,14 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 
 			// Build quads betwean edge_1 and edge_2
 			for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); it_1 != edge_1.end(); ++it_1, ++it_2) {		//ASK: it + 1 != edges.end();
-				newQuads.push(BuildQuad(*it_1, *it_2, extrusion));
+				quad q = BuildQuad(*it_1, *it_2, extrusion);
+				if (!isFacing) {
+					q = FlipQuad(q);
+				}
+				newQuads.push(q);
 			}
 		}
-	} break;
+	} break; // end "case planar"
 
 	/////////////////////////////////
 	// Convex Hull is a 3D volume: //
@@ -232,7 +216,7 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 		//Select quads facing the extrusion direction
 		std::list<quad*> selectQuads;
 		for (quad& q : hullQuads) {
-			if (dot(extrusion, q.normal) >= 0.0f) {	// if quad IS facing the direction
+			if (dot(extrusion, q.normal) > 0.0f) {	// if quad IS facing the direction
 				selectQuads.push_back(&q);
 			}
 		}
@@ -243,26 +227,26 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 		// Clone the points from edge_1 to edge 2
 		std::list<edge> edge_2;
 		std::map<size_t, size_t> indexMap; // Keeps map of indecies from edge_1 to edge_2
-		for (const edge& e : edge_1) {
+		for (const edge& e1 : edge_1) {
 			edge e2;
 			for (int i = 0; i < 2; i++) {
-				auto insResult = indexMap.insert({ e.pointIdx[i],newIdx });
+				auto insResult = indexMap.insert({ e1.pointIdx[i],newIdx });
 				if (insResult.second) {
 					e2.pointIdx[i] = newIdx;
-					newPoints.push(hullPoints[e.pointIdx[i]]);
+					newPoints.push(hullPoints[e1.pointIdx[i]]);
 					newIdx++;
 				}
 				else {
-					e2.pointIdx[i] = insResult.first->first;
+					e2.pointIdx[i] = insResult.first->second;
 				}
-				edge_2.push_back(e2);
 			}
+			edge_2.push_back(e2);
 		}
 
 		// Re-bind selectQuads quads to edge_2 and mark all for move
 		for (quad* ptr_q : selectQuads) {
 			for (int i = 0; i < 4; i++) {
-				auto it_found = indexMap.find(i);
+				auto it_found = indexMap.find(ptr_q->pointIdx[i]);
 				if (it_found != indexMap.end()) {
 					ptr_q->pointIdx[i] = it_found->second;
 				}
@@ -281,6 +265,10 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 		assert("Convex Hull state not properly defined!");
 		break;
 	}
+	///////////////////////////////////////
+	//   Constructs the new geometry:    //
+	///////////////////////////////////////
+
 	// Add new points
 	hullPoints.reserve(hullPoints.size() + newPoints.size());
 	while (!newPoints.empty()) {
@@ -303,6 +291,9 @@ void CnvH::Add(FVector extrusion, int collectionIdx) {
 			}
 		}
 	}
+	std::cout << "Points - " << hullPoints.size() << std::endl;
+	std::cout << "Quads - " << hullQuads.size() << std::endl;
+	std::cout << std::endl;
 }
 
 // Finds the open edges in selection of quads.
@@ -329,10 +320,10 @@ std::list<CnvH::edge> CnvH::FindOpenEdges(const std::list<quad*>& quadArray) {
 CnvH::quad CnvH::BuildQuad(	edge e1, edge e2, FVector dist )
 {
 	size_t idx[4] = {
-		e1.pointIdx[1],
 		e1.pointIdx[0],
-		e2.pointIdx[0],
-		e2.pointIdx[1]
+		e1.pointIdx[1],
+		e2.pointIdx[1],
+		e2.pointIdx[0]
 	};
 	FVector vec = hullPoints[idx[1]].vec - hullPoints[idx[0]].vec;
 	FVector normal = norm(cross(vec, dist));

@@ -19,9 +19,6 @@
     <Filter Include="Header Files\External">
       <UniqueIdentifier>{2491f74b-4af4-45e9-b943-a64c63cc21f6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\GL">
-      <UniqueIdentifier>{0ef09d03-07d9-4fee-b1a8-9ac57952c241}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\scr\ConvexHull\CnvH.cpp">
@@ -41,8 +38,10 @@
     <ClInclude Include="..\scr\External\FVector.h">
       <Filter>Header Files\External</Filter>
     </ClInclude>
-    <ClInclude Include="..\scr\GL\GLutilities.h">
-      <Filter>Header Files\GL</Filter>
-    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\Input\inputTest.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

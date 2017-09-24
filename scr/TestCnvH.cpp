@@ -1,6 +1,7 @@
 // TextCnvH.cpp : Defines the entry point for the console application.
 
 //debug depenancies
+#include <string>
 #include <iostream>
 #include <fstream>
 #include <assert.h>
@@ -23,6 +24,10 @@ int main() {
 	in.close();
 	std::ofstream out;
 	out.open("../Input/CnvH.obj");
+	out << "#Vertices" << std::endl;
+	out << CH_empty.GetPointStr();
+	out << "#Quads" << std::endl;
+	out << CH_empty.GetQuadStr();
 	out.close();
     return 0;
 }

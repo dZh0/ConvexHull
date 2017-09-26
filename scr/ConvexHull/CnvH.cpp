@@ -316,6 +316,25 @@ void CnvH::Add(FVector extrusion) {
 	std::cout << std::endl;
 }
 
+std::map<float, size_t> CnvH::Disolve(FVector vec) {
+	std::map<float, size_t> result;
+
+	//Select quads facing the vector
+	for (const quad& q : hullQuads) {
+		if (dot(vec, q.normal) < 0.0f) continue;
+		FVector a = hullPoints[q.pointIdx[0]].vec;
+		float k = dot(a, q.normal) / dot(vec, q.normal);
+		if (k <= 0.0f) continue;
+		FVector p = k * vec; // The intersection point of the vector and the quad plane
+		FVector b = hullPoints[q.pointIdx[1]].vec - a;
+		FVector c = hullPoints[q.pointIdx[3]].vec - a;
+		// p = m*b + n*c ->
+		float m = (p.y - p.x*c.y / c.x) / (b.y - b.x*c.y / c.x);
+		float n = p.x / c.x - m*b.x / c.x;
+		if (m < 0 || n < 0 || m > 1 || n > 1) continue;
+	}
+}
+
 std::string CnvH::GetPointStr() {
 	std::string str = "";
 	for (const point& p : hullPoints) {

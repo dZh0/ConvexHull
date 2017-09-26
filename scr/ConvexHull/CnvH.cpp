@@ -27,13 +27,13 @@ void CnvH::Add(FVector extrusion) {
 
 	// Find if there is already a vector with the same direcion in colection
 	auto found = collection.begin();
-	while (found != collection.end()-1) { // collection.end()-1 as we already added the vector
+	while (found != collection.end()-1) {	// collection.end()-1 as we already added the extrusion in the collection
 		if (isColinear(*found, extrusion) && dot(*found, extrusion) > 0.0f) {
 			break;
 		}
 		++found;
 	}
-	if (found != collection.end()-1) { // If vector in the same direction IS found in the collection
+	if (found != collection.end()-1) {		// If vector in the same direction IS found in the collection
 		collectionIdx = std::distance(collection.begin(), found);
 		for (size_t i = 0; i < hullPoints.size(); i++) {
 			const auto& map = hullPoints[i].weight;
@@ -42,7 +42,7 @@ void CnvH::Add(FVector extrusion) {
 			}
 		}
 	}
-	else { // If vector in the same direction is NOT found in the collection
+	else {									// If vector in the same direction is NOT found in the collection
 		collectionIdx = collection.size();
 		switch (state) {
 			/////////////////////////////////
@@ -316,22 +316,49 @@ void CnvH::Add(FVector extrusion) {
 	std::cout << std::endl;
 }
 
-std::map<float, size_t> CnvH::Disolve(FVector vec) {
-	std::map<float, size_t> result;
+std::map<size_t, float> CnvH::Disolve(FVector vec) {
+	std::map<size_t, float> result;
+	float k, m, n;					// vP = k*vec = vA + m*vB + n*vC
+	FVector vP;						// The intersection point of the vector and the quad plane
+	const quad *ptr_q = nullptr;	// Poiner to the quad containing vP
+	std::list<quad*> selectQuads;
 
-	//Select quads facing the vector
-	for (const quad& q : hullQuads) {
-		if (dot(vec, q.normal) < 0.0f) continue;
-		FVector a = hullPoints[q.pointIdx[0]].vec;
-		float k = dot(a, q.normal) / dot(vec, q.normal);
-		if (k <= 0.0f) continue;
-		FVector p = k * vec; // The intersection point of the vector and the quad plane
-		FVector b = hullPoints[q.pointIdx[1]].vec - a;
-		FVector c = hullPoints[q.pointIdx[3]].vec - a;
-		// p = m*b + n*c ->
-		float m = (p.y - p.x*c.y / c.x) / (b.y - b.x*c.y / c.x);
-		float n = p.x / c.x - m*b.x / c.x;
-		if (m < 0 || n < 0 || m > 1 || n > 1) continue;
+	//Find the quad that the vector intersects
+	for (quad& q : hullQuads) {
+		if (dot(vec, q.normal) < 0.0f) continue;				// If quad IS backfacing: try next quad
+		selectQuads.push_back(&q);
+		FVector vA = hullPoints[q.pointIdx[0]].vec;
+		k = dot(vA, q.normal) / dot(vec, q.normal);
+		vP = k * vec;
+		FVector vB = hullPoints[q.pointIdx[1]].vec - vA;
+		FVector vC = hullPoints[q.pointIdx[3]].vec - vA;
+		// vP = m*vB + n*vC =>
+		m = (vP.y - vP.x*vC.y / vC.x) / (vB.y - vB.x*vC.y / vC.x);
+		n = vP.x / vC.x - m*vB.x / vC.x;
+		if ( m<0.0f || n<0.0f || m>1.0f || n>1.0f ) continue;	// If vP is OUTSIDE the quad: try next quad
+		ptr_q = &q;
+	}
+	if (ptr_q == nullptr) return result;						// If intersection is NOT found: end the function
+	// Remove quads not belonging to polygon
+	auto it = selectQuads.begin();
+	while ( it != selectQuads.end()) {
+		if ((*it)->normal != ptr_q->normal){
+			it = selectQuads.erase(it);
+		}
+		else{
+			++it;
+		}
+	}
+	if (selectQuads.size == 1){									// If quad only member of polygon
+		
+	}
+	else{														// If quad belongs to a plygon
+		float p,q;						// vP = k*vec = vA + p*vQ = vQ + p*vM + q*p*(vN-vM)
+		FVector vQ;						// The intersection point of the vector and the poligon edge
+		std::list<edge> polyEdge = FindOpenEdges(selectQuads);
+		for (edge& e : polyEdge){
+			q = ()
+		}
 	}
 }
 
@@ -355,8 +382,8 @@ std::string CnvH::GetQuadStr() {
 }
 
 // Finds the open edges in selection of quads.
-std::list<CnvH::edge> CnvH::FindOpenEdges(const std::list<quad*>& quadArray) {
-	std::list<edge> openEdges;				// TODO: find optimal container for find() and erase()
+std::list<CnvH::edge> CnvH::FindOpenEdges(std::list<quad*>& quadArray) {
+	std::list<edge> openEdges;
 	for (const quad* ptr_q : quadArray) {
 		for (int i = 0; i < 4; i++) {
 			int j = (i < 3) ? j = i + 1 : j = i - 3;

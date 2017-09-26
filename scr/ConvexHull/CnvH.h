@@ -14,7 +14,7 @@ public:
 	CnvH(FVector const* p_arr, int _size);			// Array constructor
 
 	void Add(FVector extrusion);
-	std::map<float, size_t> Disolve(FVector vec);
+	std::map<size_t, float> Disolve(FVector vec);
 	// .obj return functions
 	std::string GetPointStr();
 	std::string GetQuadStr();
@@ -55,7 +55,7 @@ private:
 		size_t pointIdx[2];
 	};
 
-	std::list<edge> FindOpenEdges(const std::list<quad*>& quadArr);
+	std::list<edge> FindOpenEdges(std::list<quad*>& quadArr);
 	quad BuildQuad(edge e1, edge e2, FVector dist);
 	quad FlipQuad(const quad& q);
 	friend bool operator==(const CnvH::edge& A, const CnvH::edge& B);

@@ -317,9 +317,10 @@ void CnvH::Add(FVector extrusion) {
 }
 
 std::map<size_t, float> CnvH::Disolve(FVector vec) {
+
 	std::map<size_t, float> result;
-	float k, m, n;					// vP = k*vec = vA + m*vB + n*vC
-	FVector vP;						// The intersection point of the vector and the quad plane
+	float k, m, n;					
+	FVector vP;
 	const quad *ptr_q = nullptr;	// Poiner to the quad containing vP
 	std::list<quad*> selectQuads;
 
@@ -329,14 +330,16 @@ std::map<size_t, float> CnvH::Disolve(FVector vec) {
 		selectQuads.push_back(&q);
 		FVector vA = hullPoints[q.pointIdx[0]].vec;
 		k = dot(vA, q.normal) / dot(vec, q.normal);
-		vP = k * vec;
+		vP = k * vec - vA;
 		FVector vB = hullPoints[q.pointIdx[1]].vec - vA;
 		FVector vC = hullPoints[q.pointIdx[3]].vec - vA;
 		// vP = m*vB + n*vC =>
-		m = (vP.y - vP.x*vC.y / vC.x) / (vB.y - vB.x*vC.y / vC.x);
-		n = vP.x / vC.x - m*vB.x / vC.x;
-		if ( m<0.0f || n<0.0f || m>1.0f || n>1.0f ) continue;	// If vP is OUTSIDE the quad: try next quad
-		ptr_q = &q;
+		m = (vP.y - vP.x*vC.y/vC.x) / (vB.y - vB.x*vC.y/vC.x);
+		n = vP.x/vC.x - m*vB.x/vC.x;
+		if ( m>=0.0f && n>=0.0f && m<=1.0f && n<=1.0f ) {
+			std::cout << k << " * vec = A + " << m << " * B + " << n << " * C" << std::endl;
+			ptr_q = &q;
+		}
 	}
 	if (ptr_q == nullptr) return result;						// If intersection is NOT found: end the function
 	// Remove quads not belonging to polygon
@@ -349,34 +352,43 @@ std::map<size_t, float> CnvH::Disolve(FVector vec) {
 			++it;
 		}
 	}
-	if (selectQuads.size == 1){									// If quad only member of polygon
-		
+	if (selectQuads.size() == 1){	// If quad only member of polygon
+		std::cout << k <<" * vec = A + " << m << " * B + "<< n << " * C" << std::endl;
 	}
-	else{														// If quad belongs to a plygon
-		float p,q;						// vP = k*vec = vA + p*vQ = vQ + p*vM + q*p*(vN-vM)
-		FVector vQ;						// The intersection point of the vector and the poligon edge
+	else{							// If quad belongs to a plygon
+		float p,q;					// vP = k*vec = vA + p*vQ = vQ + p*vM + q*p*(vN-vM)
+		FVector vA = hullPoints[ptr_q->pointIdx[0]].vec;
 		std::list<edge> polyEdge = FindOpenEdges(selectQuads);
 		for (edge& e : polyEdge){
-			q = ()
+			FVector vM = hullPoints[e.pointIdx[0]].vec - vA;
+			FVector vN = hullPoints[e.pointIdx[1]].vec - vA;
+			q = (vM.x*vP.y) / (vP.x*vN.y - vP.y*vN.x - vP.x*vM.y + vP.y*vM.x);
+			p = q*vN.x / vP.x - q*vM.x / vP.x + vM.x / vP.x;
+			if (p > 0.0f && q >= 0.0f && q <= 1.0f) break;
 		}
+		std::cout << k << " * vec = A + " << q/p << " * ( N - M ) + M / " << p << std::endl;
 	}
+	return result;
 }
 
 std::string CnvH::GetPointStr() {
-	std::string str = "";
+	std::string str = "#Vertecies\n";
 	for (const point& p : hullPoints) {
 		str += "v " + std::to_string(p.vec.x) + " " + std::to_string(p.vec.y) + " " + std::to_string(p.vec.z) + "\n";
 	}
 	return str;
 };
 std::string CnvH::GetQuadStr() {
-	std::string str = "";
+	std::string str = "#Inecies\n";
 	for (const quad& q : hullQuads) {
-		str += "f ";
-		for (size_t i : q.pointIdx) {
-			str += std::to_string(i+1) + " ";
-		}
-		str += "\n";
+		str += "f "
+			+ std::to_string(q.pointIdx[0] + 1) + " "
+			+ std::to_string(q.pointIdx[1] + 1) + " "
+			+ std::to_string(q.pointIdx[2] + 1) + "\n";
+		str += "f "
+			+ std::to_string(q.pointIdx[0] + 1) + " "
+			+ std::to_string(q.pointIdx[2] + 1) + " "
+			+ std::to_string(q.pointIdx[3] + 1) + "\n";
 	}
 	return str;
 }

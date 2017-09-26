@@ -24,10 +24,15 @@ int main() {
 	in.close();
 	std::ofstream out;
 	out.open("../Input/CnvH.obj");
-	out << "#Vertices" << std::endl;
 	out << CH_empty.GetPointStr();
-	out << "#Quads" << std::endl;
 	out << CH_empty.GetQuadStr();
 	out.close();
+	while (true) {
+		float x, y, z;
+		std::cout << "Enter a vector to disolve: ";
+		std::cin >> x >> y >> z;
+		if (!x && !y && !z) break;
+		CH_empty.Disolve({ x, y, z });
+	}
     return 0;
 }

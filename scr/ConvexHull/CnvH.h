@@ -14,7 +14,7 @@ public:
 	CnvH(FVector const* p_arr, int _size);			// Array constructor
 
 	void Add(FVector extrusion);
-	std::map<size_t, float> Disolve(FVector vec);
+	void Disolve(FVector V);
 	// .obj return functions
 	std::string GetPointStr();
 	std::string GetQuadStr();

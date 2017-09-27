@@ -16,9 +16,10 @@ CnvH::CnvH(FVector const* p_arr, int _size) : state(empty){
 
 // Adds a FVector to the hull.
 void CnvH::Add(FVector extrusion) {
-	collection.push_back(extrusion);
-	if (extrusion == FV_ZERO) return;		// Don't change geometry if vector is {0,0,0}
 	size_t collectionIdx;
+	collection.push_back(extrusion);
+	std::cout << "# "<< collection.size() << "  " << extrusion;
+	if (extrusion == FV_ZERO) return;		// Don't change geometry if vector is {0,0,0}
 	
 	std::queue<point> newPoints;			// Points to be added during the extrusion (FiFo)
 	std::queue<quad> newQuads;				// Quads to be added during the extrusion (FiFo)
@@ -49,7 +50,7 @@ void CnvH::Add(FVector extrusion) {
 			//    Convex Hull is empty:    //
 			/////////////////////////////////
 		case empty: {
-			std::cout << "Add first point - " << extrusion << std::endl;
+			std::cout << "  Add first point";
 			state = linear;
 			newPoints.emplace();
 			newIdx++;
@@ -65,7 +66,7 @@ void CnvH::Add(FVector extrusion) {
 
 			if (isColinear(extrusion, hullLine)) {	// If the extrusion direction is on the hull line:
 				state = linear;
-				std::cout << "Linear extrusion - " << extrusion << std::endl;
+				std::cout << "  Linear extrusion";
 
 				// Provide the index of the furthest point on the hullLine in the extrude direction
 				size_t endIdx = 0;
@@ -88,7 +89,7 @@ void CnvH::Add(FVector extrusion) {
 			}
 			else {	// If the extrusion direction is NOT on the hull line:
 				state = planar;
-				std::cout << "Line to plane extrusion - " << extrusion << std::endl;
+				std::cout << "  Line to plane extrusion";
 
 				// Build edge_1 from existing points (not a loop)
 				std::list<size_t> edge_1 = { 0 };
@@ -139,7 +140,7 @@ void CnvH::Add(FVector extrusion) {
 
 			if (dot(extrusion, hullNormal) == 0.0f) {	// If the extrusion direction IS on the hull plane:
 				state = planar;
-				std::cout << "Planar extrude - " << extrusion << std::endl;
+				std::cout << "  Planar extrude";
 
 				// Delete edges that are not facing the extrusion direction (no longer loop)
 				FVector direction = cross(hullNormal, extrusion);
@@ -183,7 +184,7 @@ void CnvH::Add(FVector extrusion) {
 			}
 			else {	// If the extrusion direction is NOT on the hull plane:
 				state = volume;
-				std::cout << "Plane to volume extrude - " << extrusion << std::endl;
+				std::cout << "  Plane to volume extrude";
 
 				// As the whole hull will be cloned all new points have index = old_index + index_offset 
 				const size_t indexOffset = newIdx;
@@ -230,7 +231,7 @@ void CnvH::Add(FVector extrusion) {
 		// Convex Hull is a 3D volume: //
 		/////////////////////////////////
 		case volume: {
-			std::cout << "Volume extrude - " << extrusion << std::endl;
+			std::cout << "  Volume extrude" << extrusion << std::endl;
 
 			//Select quads facing the extrusion direction
 			std::list<quad*> selectQuads;
@@ -312,63 +313,50 @@ void CnvH::Add(FVector extrusion) {
 			}
 		}
 	}
-	std::cout << "Points: " << hullPoints.size() <<"      Quads: " << hullQuads.size() << std::endl;
-	std::cout << std::endl;
+	std::cout << " points: " << hullPoints.size() <<" quads: " << hullQuads.size() << std::endl;
 }
 
-std::map<size_t, float> CnvH::Disolve(FVector vec) {
+void CnvH::Disolve(FVector V) {
+	FVector result;
+	float k, p, q;					// Coefficents
+	FVector P;						// Intersection of V with convex hull. ( P = k*V | k >= 0.0f)
+	FVector Q;						// Intersection of the projection of V with the polygon face. Q = p*P;
+	FVector A;						// Quad base point
+	std::list<quad*> selectQuads;	// Polygon quads
 
-	std::map<size_t, float> result;
-	float k, m, n;					
-	FVector vP;
-	const quad *ptr_q = nullptr;	// Poiner to the quad containing vP
-	std::list<quad*> selectQuads;
+	switch (state){
+	case volume:{
 
-	//Find the quad that the vector intersects
-	for (quad& q : hullQuads) {
-		if (dot(vec, q.normal) < 0.0f) continue;				// If quad IS backfacing: try next quad
-		selectQuads.push_back(&q);
-		FVector vA = hullPoints[q.pointIdx[0]].vec;
-		k = dot(vA, q.normal) / dot(vec, q.normal);
-		vP = k * vec - vA;
-		FVector vB = hullPoints[q.pointIdx[1]].vec - vA;
-		FVector vC = hullPoints[q.pointIdx[3]].vec - vA;
-		// vP = m*vB + n*vC =>
-		m = (vP.y - vP.x*vC.y/vC.x) / (vB.y - vB.x*vC.y/vC.x);
-		n = vP.x/vC.x - m*vB.x/vC.x;
-		if ( m>=0.0f && n>=0.0f && m<=1.0f && n<=1.0f ) {
-			std::cout << k << " * vec = A + " << m << " * B + " << n << " * C" << std::endl;
-			ptr_q = &q;
+	}
+	case planar:{
+
+	}
+	case linear:{
+		if (isColinear(V, hullPoints[1].vec)) {
+			const point* maxP = &hullPoints[0];
+			float dir = dot(V, maxP->vec);
+			for (const point& p : hullPoints){
+				float newDir = dot(V, p.vec);
+				if (newDir > dir){
+					dir = newDir;
+					maxP = &p;
+				}
+			}
+			if (maxP->vec != FV_ZERO){
+				result = maxP->vec;
+				float k = V.x / result.x;
+				float j = 1.0f;
+				if (k < 1.0f) result *= k;
+				else j = 1.0f / k;
+				std::cout << j << " * V " << V << "is constructed by:" << std::endl;
+				return;
+			}
 		}
 	}
-	if (ptr_q == nullptr) return result;						// If intersection is NOT found: end the function
-	// Remove quads not belonging to polygon
-	auto it = selectQuads.begin();
-	while ( it != selectQuads.end()) {
-		if ((*it)->normal != ptr_q->normal){
-			it = selectQuads.erase(it);
-		}
-		else{
-			++it;
-		}
+	default:{
+		std::cout << "!!!  Vector can not be desolved to any non-zero construction vector combination." << std::endl;
+	}break;
 	}
-	if (selectQuads.size() == 1){	// If quad only member of polygon
-		std::cout << k <<" * vec = A + " << m << " * B + "<< n << " * C" << std::endl;
-	}
-	else{							// If quad belongs to a plygon
-		float p,q;					// vP = k*vec = vA + p*vQ = vQ + p*vM + q*p*(vN-vM)
-		FVector vA = hullPoints[ptr_q->pointIdx[0]].vec;
-		std::list<edge> polyEdge = FindOpenEdges(selectQuads);
-		for (edge& e : polyEdge){
-			FVector vM = hullPoints[e.pointIdx[0]].vec - vA;
-			FVector vN = hullPoints[e.pointIdx[1]].vec - vA;
-			q = (vM.x*vP.y) / (vP.x*vN.y - vP.y*vN.x - vP.x*vM.y + vP.y*vM.x);
-			p = q*vN.x / vP.x - q*vM.x / vP.x + vM.x / vP.x;
-			if (p > 0.0f && q >= 0.0f && q <= 1.0f) break;
-		}
-		std::cout << k << " * vec = A + " << q/p << " * ( N - M ) + M / " << p << std::endl;
-	}
-	return result;
 }
 
 std::string CnvH::GetPointStr() {

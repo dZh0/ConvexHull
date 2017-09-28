@@ -18,7 +18,7 @@ CnvH::CnvH(FVector const* p_arr, int _size) : state(empty){
 void CnvH::Add(FVector extrusion) {
 	size_t collectionIdx;
 	collection.push_back(extrusion);
-	std::cout << "# "<< collection.size() << "  " << extrusion;
+	std::cout << "#"<< collection.size() << "  " << extrusion;
 	if (extrusion == FV_ZERO) return;		// Don't change geometry if vector is {0,0,0}
 	
 	std::queue<point> newPoints;			// Points to be added during the extrusion (FiFo)
@@ -35,6 +35,7 @@ void CnvH::Add(FVector extrusion) {
 		++found;
 	}
 	if (found != collection.end()-1) {		// If vector in the same direction IS found in the collection
+		std::cout << "  Move points:             ";
 		collectionIdx = std::distance(collection.begin(), found);
 		for (size_t i = 0; i < hullPoints.size(); i++) {
 			const auto& map = hullPoints[i].weight;
@@ -44,13 +45,13 @@ void CnvH::Add(FVector extrusion) {
 		}
 	}
 	else {									// If vector in the same direction is NOT found in the collection
-		collectionIdx = collection.size();
+		collectionIdx = collection.size()-1;
 		switch (state) {
 			/////////////////////////////////
 			//    Convex Hull is empty:    //
 			/////////////////////////////////
 		case empty: {
-			std::cout << "  Add first point";
+			std::cout << "  Add first point:         ";
 			state = linear;
 			newPoints.emplace();
 			newIdx++;
@@ -66,7 +67,7 @@ void CnvH::Add(FVector extrusion) {
 
 			if (isColinear(extrusion, hullLine)) {	// If the extrusion direction is on the hull line:
 				state = linear;
-				std::cout << "  Linear extrusion";
+				std::cout << "  Linear extrusion:        ";
 
 				// Provide the index of the furthest point on the hullLine in the extrude direction
 				size_t endIdx = 0;
@@ -89,7 +90,7 @@ void CnvH::Add(FVector extrusion) {
 			}
 			else {	// If the extrusion direction is NOT on the hull line:
 				state = planar;
-				std::cout << "  Line to plane extrusion";
+				std::cout << "  Line to plane extrusion: ";
 
 				// Build edge_1 from existing points (not a loop)
 				std::list<size_t> edge_1 = { 0 };
@@ -140,7 +141,7 @@ void CnvH::Add(FVector extrusion) {
 
 			if (dot(extrusion, hullNormal) == 0.0f) {	// If the extrusion direction IS on the hull plane:
 				state = planar;
-				std::cout << "  Planar extrude";
+				std::cout << "  Planar extrude:          ";
 
 				// Delete edges that are not facing the extrusion direction (no longer loop)
 				FVector direction = cross(hullNormal, extrusion);
@@ -184,7 +185,7 @@ void CnvH::Add(FVector extrusion) {
 			}
 			else {	// If the extrusion direction is NOT on the hull plane:
 				state = volume;
-				std::cout << "  Plane to volume extrude";
+				std::cout << "  Plane to volume extrude: ";
 
 				// As the whole hull will be cloned all new points have index = old_index + index_offset 
 				const size_t indexOffset = newIdx;
@@ -231,7 +232,7 @@ void CnvH::Add(FVector extrusion) {
 		// Convex Hull is a 3D volume: //
 		/////////////////////////////////
 		case volume: {
-			std::cout << "  Volume extrude" << extrusion << std::endl;
+			std::cout << "  Volume extrude:          " << extrusion << std::endl;
 
 			//Select quads facing the extrusion direction
 			std::list<quad*> selectQuads;
@@ -317,7 +318,7 @@ void CnvH::Add(FVector extrusion) {
 }
 
 void CnvH::Disolve(FVector V) {
-	FVector result;
+	point pnt;
 	float k, p, q;					// Coefficents
 	FVector P;						// Intersection of V with convex hull. ( P = k*V | k >= 0.0f)
 	FVector Q;						// Intersection of the projection of V with the polygon face. Q = p*P;
@@ -333,28 +334,35 @@ void CnvH::Disolve(FVector V) {
 	}
 	case linear:{
 		if (isColinear(V, hullPoints[1].vec)) {
-			const point* maxP = &hullPoints[0];
-			float dir = dot(V, maxP->vec);
+			const point* maxP = nullptr;
+			float dir = 0.0f;
 			for (const point& p : hullPoints){
 				float newDir = dot(V, p.vec);
-				if (newDir > dir){
+				if (newDir > dir || !nullptr){
 					dir = newDir;
 					maxP = &p;
 				}
 			}
 			if (maxP->vec != FV_ZERO){
-				result = maxP->vec;
-				float k = V.x / result.x;
+				pnt = *maxP;
+				float k = V.x / pnt.vec.x;
 				float j = 1.0f;
-				if (k < 1.0f) result *= k;
+				if (k < 1.0f) pnt *= k;
 				else j = 1.0f / k;
-				std::cout << j << " * V " << V << "is constructed by:" << std::endl;
-				return;
+				std::cout << j << " * " << V << "is constructed by:" << std::endl;
 			}
 		}
 	}
 	default:{
-		std::cout << "!!!  Vector can not be desolved to any non-zero construction vector combination." << std::endl;
+		if (pnt.weight.size()) {
+			for (auto w : pnt.weight) {
+				std::cout << "#" << w.first << " * "<< w.second << "  " << hullPoints[w.first].vec << std::endl;
+			}
+		}
+		else
+		{
+			std::cout << "!!!  Vector can not be desolved to any non-zero collection vector combination." << std::endl;
+		}
 	}break;
 	}
 }

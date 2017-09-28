@@ -30,24 +30,13 @@ private:
 		std::map<int, float> weight;
 
 		point() : vec(FV_ZERO) {};
-		inline std::ostream& operator<<(std::ostream& ostr) {
-			ostr << "v " << vec.x << " " << vec.y << " " << vec.z;
-			return ostr;
-		}
+		point& operator *= (float a) { for (auto w : weight) w.second *= a;	return *this; };
 	};
 	std::vector<point> hullPoints;			// Points of the Convex Hull (MUST BE INDEXED CONTAINER!)
 
 	struct quad {
 		size_t pointIdx[4];
 		FVector normal;
-		inline std::ostream& operator<<(std::ostream& ostr) {
-			ostr << "v ";
-			for (int i = 0; i < 4; i++) {
-				ostr << pointIdx[i];
-				if (i < 3) ostr << " ";
-			}
-			return ostr;
-		}
 	};
 	std::vector<quad> hullQuads;			// Quads of the Convex Hull
 

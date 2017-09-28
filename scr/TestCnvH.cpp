@@ -28,8 +28,9 @@ int main() {
 	out << CH_empty.GetQuadStr();
 	out.close();
 	while (true) {
-		float x, y, z;
+		std::cout << std::endl;
 		std::cout << "Enter a vector to disolve: ";
+		float x, y, z;
 		std::cin >> x >> y >> z;
 		if (!x && !y && !z) break;
 		CH_empty.Disolve({ x, y, z });

@@ -1,13 +1,33 @@
 // debug dependencies
 #include <assert.h>
-#include <sstream>
+// true dependencies
+#include <fstream>
 #include <queue>
 #include <unordered_set>
-// true dependencies
 #include "CnvH.h"
 
+CnvH::CnvH(void){
+	state = volume;
+	hullPoints.reserve(8);
+	hullPoints.emplace_back(FVector{ 0.0f, 0.0f, 0.0f });
+	hullPoints.emplace_back(FVector{ 1.0f, 0.0f, 0.0f });
+	hullPoints.emplace_back(FVector{ 1.0f, 1.0f, 0.0f });
+	hullPoints.emplace_back(FVector{ 0.0f, 1.0f, 0.0f });
+	hullPoints.emplace_back(FVector{ 0.0f, 0.0f, 1.0f });
+	hullPoints.emplace_back(FVector{ 1.0f, 0.0f, 1.0f });
+	hullPoints.emplace_back(FVector{ 1.0f, 1.0f, 1.0f });
+	hullPoints.emplace_back(FVector{ 0.0f, 1.0f, 1.0f });
+	hullQuads.reserve(6);
+	hullQuads.emplace_back(0, 3, 2, 1, FVector{ 0.0f, 0.0f, -1.0f });
+	hullQuads.emplace_back(4, 5, 6, 7, FVector{ 0.0f, 0.0f, 1.0f });
+	hullQuads.emplace_back(0, 1, 5, 4, FVector{ 0.0f, -1.0f, 0.0f });
+	hullQuads.emplace_back(2, 3, 7, 6, FVector{ 0.0f, 1.0f, 0.0f });
+	hullQuads.emplace_back(0, 4, 7, 3, FVector{ -1.0f, 0.0f, 0.0f });
+	hullQuads.emplace_back(1, 2, 6, 5, FVector{ 1.0f, 0.0f, 0.0f });
+};
+
 // Creates CnvH from C-style FVector array.
-CnvH::CnvH(FVector const* p_arr, int _size) : state(empty){
+CnvH::CnvH(FVector const* p_arr, int _size) : CnvH::CnvH(){
 	collection.reserve(_size);
 	for (int i = 0; i < _size; i++) {
 		Add(p_arr[i]);
@@ -118,7 +138,7 @@ void CnvH::Add(FVector extrusion) {
 				for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); next(it_1) != edge_1.end(); ++it_1, ++it_2) {
 					FVector edgeVec = hullPoints[*next(it_1)].vec - hullPoints[*it_1].vec;
 					FVector normal = norm(cross(edgeVec, extrusion));
-					newQuads.push(quad{ { *it_1, *next(it_1), *next(it_2), *it_2 }, normal });
+					newQuads.emplace(*it_1, *next(it_1), *next(it_2), *it_2, normal);
 				}
 
 			}
@@ -318,75 +338,20 @@ void CnvH::Add(FVector extrusion) {
 }
 
 void CnvH::Disolve(FVector V) {
-	point pnt;
-	float k, p, q;					// Coefficents
-	FVector P;						// Intersection of V with convex hull. ( P = k*V | k >= 0.0f)
-	FVector Q;						// Intersection of the projection of V with the polygon face. Q = p*P;
-	FVector A;						// Quad base point
-	std::list<quad*> selectQuads;	// Polygon quads
 
-	switch (state){
-	case volume:{
-
-	}
-	case planar:{
-
-	}
-	case linear:{
-		if (isColinear(V, hullPoints[1].vec)) {
-			const point* maxP = nullptr;
-			float dir = 0.0f;
-			for (const point& p : hullPoints){
-				float newDir = dot(V, p.vec);
-				if (newDir > dir || !nullptr){
-					dir = newDir;
-					maxP = &p;
-				}
-			}
-			if (maxP->vec != FV_ZERO){
-				pnt = *maxP;
-				float k = V.x / pnt.vec.x;
-				float j = 1.0f;
-				if (k < 1.0f) pnt *= k;
-				else j = 1.0f / k;
-				std::cout << j << " * " << V << "is constructed by:" << std::endl;
-			}
-		}
-	}
-	default:{
-		if (pnt.weight.size()) {
-			for (auto w : pnt.weight) {
-				std::cout << "#" << w.first << " * "<< w.second << "  " << hullPoints[w.first].vec << std::endl;
-			}
-		}
-		else
-		{
-			std::cout << "!!!  Vector can not be desolved to any non-zero collection vector combination." << std::endl;
-		}
-	}break;
-	}
 }
 
-std::string CnvH::GetPointStr() {
-	std::string str = "#Vertecies\n";
-	for (const point& p : hullPoints) {
-		str += "v " + std::to_string(p.vec.x) + " " + std::to_string(p.vec.y) + " " + std::to_string(p.vec.z) + "\n";
+std::ofstream& operator<<(std::ofstream& ostr, const CnvH& hull){
+	ostr << "#Vertecies" <<std::endl;
+	for (const CnvH::point& p : hull.hullPoints) {
+		ostr << "v " << p.vec.x << " " << p.vec.y << " " << p.vec.z << std::endl;
+	};
+	ostr << "#Inecies" << std::endl;
+	for (const CnvH::quad& q : hull.hullQuads) {
+		ostr << "f " << q.pointIdx[0] + 1 << " " << q.pointIdx[1] + 1 << " " << q.pointIdx[2] + 1 << std::endl;
+		ostr << "f " << q.pointIdx[0] + 1 << " " << q.pointIdx[2] + 1 << " " << q.pointIdx[3] + 1 << std::endl;
 	}
-	return str;
-};
-std::string CnvH::GetQuadStr() {
-	std::string str = "#Inecies\n";
-	for (const quad& q : hullQuads) {
-		str += "f "
-			+ std::to_string(q.pointIdx[0] + 1) + " "
-			+ std::to_string(q.pointIdx[1] + 1) + " "
-			+ std::to_string(q.pointIdx[2] + 1) + "\n";
-		str += "f "
-			+ std::to_string(q.pointIdx[0] + 1) + " "
-			+ std::to_string(q.pointIdx[2] + 1) + " "
-			+ std::to_string(q.pointIdx[3] + 1) + "\n";
-	}
-	return str;
+	return ostr;
 }
 
 // Finds the open edges in selection of quads.
@@ -420,7 +385,7 @@ CnvH::quad CnvH::BuildQuad(	edge e1, edge e2, FVector dist )
 	};
 	FVector vec = hullPoints[idx[1]].vec - hullPoints[idx[0]].vec;
 	FVector normal = norm(cross(vec, dist));
-	return quad{ { idx[0], idx[1], idx[2], idx[3] }, normal };
+	return quad( idx[0], idx[1], idx[2], idx[3], normal );
 }
 
 // Returns a quad with reverse normal
@@ -432,7 +397,7 @@ CnvH::quad CnvH::FlipQuad(const quad& q) {
 		q.pointIdx[1],
 	};
 	FVector normal = q.normal * -1.0f;
-	return quad{ { idx[0], idx[1], idx[2], idx[3] }, normal };
+	return quad( idx[0], idx[1], idx[2], idx[3], normal );
 }
 
 bool operator==(const CnvH::edge& A, const CnvH::edge& B) {

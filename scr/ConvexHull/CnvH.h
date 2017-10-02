@@ -10,14 +10,13 @@
 
 class CnvH {
 public:
-	CnvH() :state(empty) {};						// Default constructor
-	CnvH(FVector const* p_arr, int _size);			// Array constructor
+	CnvH();
+	CnvH(FVector const* p_arr, int _size);
 
 	void Add(FVector extrusion);
 	void Disolve(FVector V);
 	// .obj return functions
-	std::string GetPointStr();
-	std::string GetQuadStr();
+	friend std::ofstream& operator<<(std::ofstream& ostr, const CnvH& hull);
 
 private:
 	enum geometry { empty, linear, planar, volume };
@@ -29,7 +28,7 @@ private:
 		FVector vec;
 		std::map<int, float> weight;
 
-		point() : vec(FV_ZERO) {};
+		point(FVector _vec = FV_ZERO) : vec(_vec) {};
 		point& operator *= (float a) { for (auto w : weight) w.second *= a;	return *this; };
 	};
 	std::vector<point> hullPoints;			// Points of the Convex Hull (MUST BE INDEXED CONTAINER!)
@@ -37,6 +36,10 @@ private:
 	struct quad {
 		size_t pointIdx[4];
 		FVector normal;
+
+		quad(size_t a, size_t b, size_t c, size_t d, FVector _norm) : normal(_norm) {
+			pointIdx[0] = a; pointIdx[1] = b; pointIdx[2] = c; pointIdx[3] = d;
+		}
 	};
 	std::vector<quad> hullQuads;			// Quads of the Convex Hull
 

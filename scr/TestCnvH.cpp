@@ -24,8 +24,7 @@ int main() {
 	in.close();
 	std::ofstream out;
 	out.open("../Input/CnvH.obj");
-	out << CH_empty.GetPointStr();
-	out << CH_empty.GetQuadStr();
+	out << CH_empty;
 	out.close();
 	while (true) {
 		std::cout << std::endl;

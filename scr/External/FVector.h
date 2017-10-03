@@ -22,11 +22,11 @@ inline std::ostream& operator<<(std::ostream& ostr, const FVector& v) {
 }
 #endif //_IOSTREAM_
 
-inline FVector operator*(const FVector& A, const float& B){
+inline FVector operator*(const FVector& A, float B){
 	return FVector{A.x*B,A.y*B,A.z*B};
 }
 
-inline FVector operator*(const float& A, const FVector& B){
+inline FVector operator*(float A, const FVector& B){
 	return FVector{B.x*A,B.y*A,B.z*A};
 }
 
@@ -36,6 +36,10 @@ inline FVector operator+(const FVector& A, const FVector& B){
 
 inline FVector operator-(const FVector& A, const FVector& B){
 	return FVector{ A.x - B.x, A.y - B.y, A.z - B.z };
+};
+
+inline FVector operator-(const FVector& A) {
+	return FVector{ -A.x, -A.x, -A.z };
 };
 
 inline float dot(const FVector& A, const FVector& B){

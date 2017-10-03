@@ -337,11 +337,39 @@ void CnvH::Add(FVector extrusion) {
 	std::cout << " points: " << hullPoints.size() <<" quads: " << hullQuads.size() << std::endl;
 }
 
-void CnvH::Disolve(FVector V) {
+// Returns the determinant of a 3x3 matrix constructed by the column vector parameters
+inline float det3(FVector a, FVector b, FVector c) {
+	return a.x * b.y * c.z + a.y * b.z * c.x + a.z * b.x * c.y - a.x * b.z * c.y - a.y * b.x * c.z - a.z * b.y * c.x;
+}
 
+void CnvH::Disolve(FVector vec) {
+	// Intersection point P is part of the line vec -> P = k*vec
+	// Intersection point P is part of the plane OAB -> P = O + m*A + n*B
+	// -> k*V - m*A - n*B = O
+	// Where A and B are quad edges and O is their common point
+	// and k, m and n are real number coaficents
+	float k, m, n;
+	auto it = hullQuads.begin();
+	for (; it != hullQuads.end(); ++it) {
+		FVector vO = it->getPnt(0).vec;
+		FVector vA = it->getPnt(1).vec - it->getPnt(0).vec;
+		FVector vB = it->getPnt(3).vec - it->getPnt(0).vec;
+		float det = det3(vec,-vA,-vB);
+		if (det == 0.0f) continue;	// vec lays on OAB
+		k = det3(vO, -vA, -vB) / det;
+		if (k <= 0.0f)continue;	//vec intersevts OAB in reverse direction
+		m = det3(vec, -vA, -vB) / det;
+		n = det3(vec, -vA, -vB) / det;
+		if (m>=0.0f && n>=0.0f && m<=1.0f && n<=1.0f) break;
+	}
+	float scale = (k > 1.0f) ? k : 1.0f;
+	point pnt = (1.0f - m - n)*it->getPnt(0) + m*it->getPnt(1) + n*it->getPnt(3);
+	pnt *= scale;
 }
 
 std::ofstream& operator<<(std::ofstream& ostr, const CnvH& hull){
+	ostr.setf(std::ios::fixed, std::ios::floatfield);
+	ostr.setf(std::ios::showpoint);
 	ostr << "#Vertecies" <<std::endl;
 	for (const CnvH::point& p : hull.hullPoints) {
 		ostr << "v " << p.vec.x << " " << p.vec.y << " " << p.vec.z << std::endl;
@@ -385,7 +413,7 @@ CnvH::quad CnvH::BuildQuad(	edge e1, edge e2, FVector dist )
 	};
 	FVector vec = hullPoints[idx[1]].vec - hullPoints[idx[0]].vec;
 	FVector normal = norm(cross(vec, dist));
-	return quad( idx[0], idx[1], idx[2], idx[3], normal );
+	return quad( idx[0], idx[1], idx[2], idx[3], normal , this);
 }
 
 // Returns a quad with reverse normal
@@ -397,10 +425,58 @@ CnvH::quad CnvH::FlipQuad(const quad& q) {
 		q.pointIdx[1],
 	};
 	FVector normal = q.normal * -1.0f;
-	return quad( idx[0], idx[1], idx[2], idx[3], normal );
+	return quad( idx[0], idx[1], idx[2], idx[3], normal, this);
 }
 
 bool operator==(const CnvH::edge& A, const CnvH::edge& B) {
 	if (&A == &B) return true;
 	return  A.pointIdx[0] == B.pointIdx[0] && A.pointIdx[1] == B.pointIdx[1];
+}
+
+CnvH::point operator*(float A, const CnvH::point& B)
+{
+	CnvH::point result = B;
+	result.vec *= A;
+	for (auto w : result.weight) {
+		w.second *= A;
+	}
+	return result;
+}
+
+CnvH::point operator*(const CnvH::point& A, float B){
+	CnvH::point result = A;
+	result.vec *= B;
+	for (auto w : result.weight) {
+		w.second *= B;
+	}
+	return result;
+}
+
+CnvH::point operator+(const CnvH::point& A, const CnvH::point& B)
+{
+	CnvH::point pnt = A;
+	pnt.vec += B.vec;
+	for (auto w : B.weight) {
+		auto ret = pnt.weight.insert(w);
+		if (!ret.second) {
+			ret.first->second += w.second;
+			if (ret.first->second == 0.0f) pnt.weight.erase(ret.first);
+		}
+	}
+	return pnt;
+}
+
+CnvH::point operator-(const CnvH::point& A, const CnvH::point& B)
+{
+	CnvH::point pnt = A;
+	pnt.vec -= B.vec;
+	for (auto w : B.weight) {
+		w.second *= -1.0f;
+		auto ret = pnt.weight.insert(w);
+		if (!ret.second) {
+			ret.first->second += w.second;
+			if (ret.first->second == 0.0f) pnt.weight.erase(ret.first);
+		}
+	}
+	return pnt;
 }

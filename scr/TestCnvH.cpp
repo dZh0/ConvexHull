@@ -29,10 +29,10 @@ int main() {
 	while (true) {
 		std::cout << std::endl;
 		std::cout << "Enter a vector to disolve: ";
-		float x, y, z;
-		std::cin >> x >> y >> z;
-		if (!x && !y && !z) break;
-		CH_empty.Disolve({ x, y, z });
+		FVector vec;
+		std::cin >> vec.x >> vec.y >> vec.z;
+		if (vec == FV_ZERO) break;
+		CH_empty.Disolve(vec);
 	}
     return 0;
 }

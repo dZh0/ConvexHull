@@ -26,7 +26,7 @@ private:
 
 	struct point {
 		FVector vec;
-		std::map<int, float> weight;
+		std::map<size_t, float> weight;
 
 		point(FVector _vec = FV_ZERO) : vec(_vec) {};
 		point& operator *= (float a) { for (auto w : weight) w.second *= a;	return *this; };
@@ -34,12 +34,14 @@ private:
 	std::vector<point> hullPoints;			// Points of the Convex Hull (MUST BE INDEXED CONTAINER!)
 
 	struct quad {
+		const CnvH* parent;
 		size_t pointIdx[4];
 		FVector normal;
 
-		quad(size_t a, size_t b, size_t c, size_t d, FVector _norm) : normal(_norm) {
+		quad(size_t a, size_t b, size_t c, size_t d, FVector _norm, CnvH* _parent) : normal(_norm) {
 			pointIdx[0] = a; pointIdx[1] = b; pointIdx[2] = c; pointIdx[3] = d;
 		}
+		const point& getPnt(int i) const { return parent->hullPoints[pointIdx[i]]; };
 	};
 	std::vector<quad> hullQuads;			// Quads of the Convex Hull
 
@@ -51,4 +53,8 @@ private:
 	quad BuildQuad(edge e1, edge e2, FVector dist);
 	quad FlipQuad(const quad& q);
 	friend bool operator==(const CnvH::edge& A, const CnvH::edge& B);
+	friend point operator*(float A, const point& B);
+	friend point operator*(const point& A, float B);
+	friend point operator+(const point& A, const point& B);
+	friend point operator-(const point& A, const point& B);
 };

@@ -10,7 +10,7 @@
 
 class CnvH {
 public:
-	CnvH();
+	CnvH() : state(empty) {};
 	CnvH(FVector const* p_arr, int _size);
 
 	void Add(FVector extrusion);
@@ -25,20 +25,21 @@ private:
 	std::vector<FVector> collection;		// Collection of references TODO: set template class container
 
 	struct point {
+		CnvH* parent;
 		FVector vec;
 		std::map<size_t, float> weight;
 
-		point(FVector _vec = FV_ZERO) : vec(_vec) {};
+		point(CnvH* _parent, FVector _vec = FV_ZERO) : parent(_parent), vec(_vec) {};
 		point& operator *= (float a) { for (auto w : weight) w.second *= a;	return *this; };
 	};
 	std::vector<point> hullPoints;			// Points of the Convex Hull (MUST BE INDEXED CONTAINER!)
 
 	struct quad {
-		const CnvH* parent;
+		CnvH* parent;
 		size_t pointIdx[4];
 		FVector normal;
 
-		quad(size_t a, size_t b, size_t c, size_t d, FVector _norm, CnvH* _parent) : normal(_norm) {
+		quad(CnvH* _parent, size_t a, size_t b, size_t c, size_t d, FVector _norm) : parent(_parent), normal(_norm) {
 			pointIdx[0] = a; pointIdx[1] = b; pointIdx[2] = c; pointIdx[3] = d;
 		}
 		const point& getPnt(int i) const { return parent->hullPoints[pointIdx[i]]; };
@@ -57,4 +58,5 @@ private:
 	friend point operator*(const point& A, float B);
 	friend point operator+(const point& A, const point& B);
 	friend point operator-(const point& A, const point& B);
+	friend std::ostream& operator<<(std::ostream& ostr, const point& p);
 };

@@ -6,25 +6,27 @@
 #include <unordered_set>
 #include "CnvH.h"
 
+/*
 CnvH::CnvH(void){
 	state = volume;
 	hullPoints.reserve(8);
-	hullPoints.emplace_back(FVector{ 0.0f, 0.0f, 0.0f });
-	hullPoints.emplace_back(FVector{ 1.0f, 0.0f, 0.0f });
-	hullPoints.emplace_back(FVector{ 1.0f, 1.0f, 0.0f });
-	hullPoints.emplace_back(FVector{ 0.0f, 1.0f, 0.0f });
-	hullPoints.emplace_back(FVector{ 0.0f, 0.0f, 1.0f });
-	hullPoints.emplace_back(FVector{ 1.0f, 0.0f, 1.0f });
-	hullPoints.emplace_back(FVector{ 1.0f, 1.0f, 1.0f });
-	hullPoints.emplace_back(FVector{ 0.0f, 1.0f, 1.0f });
+	hullPoints.emplace_back(this, FVector{ 0.0f, 0.0f, 0.0f });
+	hullPoints.emplace_back(this, FVector{ 1.0f, 0.0f, 0.0f });
+	hullPoints.emplace_back(this, FVector{ 1.0f, 1.0f, 0.0f });
+	hullPoints.emplace_back(this, FVector{ 0.0f, 1.0f, 0.0f });
+	hullPoints.emplace_back(this, FVector{ 0.0f, 0.0f, 1.0f });
+	hullPoints.emplace_back(this, FVector{ 1.0f, 0.0f, 1.0f });
+	hullPoints.emplace_back(this, FVector{ 1.0f, 1.0f, 1.0f });
+	hullPoints.emplace_back(this, FVector{ 0.0f, 1.0f, 1.0f });
 	hullQuads.reserve(6);
-	hullQuads.emplace_back(0, 3, 2, 1, FVector{ 0.0f, 0.0f, -1.0f });
-	hullQuads.emplace_back(4, 5, 6, 7, FVector{ 0.0f, 0.0f, 1.0f });
-	hullQuads.emplace_back(0, 1, 5, 4, FVector{ 0.0f, -1.0f, 0.0f });
-	hullQuads.emplace_back(2, 3, 7, 6, FVector{ 0.0f, 1.0f, 0.0f });
-	hullQuads.emplace_back(0, 4, 7, 3, FVector{ -1.0f, 0.0f, 0.0f });
-	hullQuads.emplace_back(1, 2, 6, 5, FVector{ 1.0f, 0.0f, 0.0f });
+	hullQuads.emplace_back(this, 0, 3, 2, 1, FVector{ 0.0f, 0.0f, -1.0f });
+	hullQuads.emplace_back(this, 4, 5, 6, 7, FVector{ 0.0f, 0.0f, 1.0f });
+	hullQuads.emplace_back(this, 0, 1, 5, 4, FVector{ 0.0f, -1.0f, 0.0f });
+	hullQuads.emplace_back(this, 2, 3, 7, 6, FVector{ 0.0f, 1.0f, 0.0f });
+	hullQuads.emplace_back(this, 0, 4, 7, 3, FVector{ -1.0f, 0.0f, 0.0f });
+	hullQuads.emplace_back(this, 1, 2, 6, 5, FVector{ 1.0f, 0.0f, 0.0f });
 };
+*/
 
 // Creates CnvH from C-style FVector array.
 CnvH::CnvH(FVector const* p_arr, int _size) : CnvH::CnvH(){
@@ -73,9 +75,9 @@ void CnvH::Add(FVector extrusion) {
 		case empty: {
 			std::cout << "  Add first point:         ";
 			state = linear;
-			newPoints.emplace();
+			newPoints.emplace(this);
 			newIdx++;
-			newPoints.emplace();
+			newPoints.emplace(this);
 			moveIdx.insert(newIdx);
 		} break;	//end "case empty"
 
@@ -100,7 +102,7 @@ void CnvH::Add(FVector extrusion) {
 				}
 				// If the selected point IS the origin: clone it and mark the cloned point for translation
 				if (hullPoints[endIdx].vec == FV_ZERO) {
-					newPoints.emplace();
+					newPoints.emplace(this);
 					moveIdx.insert(newIdx);
 				}
 				// If the selected point is NOT the origin: mark it for translation
@@ -138,7 +140,7 @@ void CnvH::Add(FVector extrusion) {
 				for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); next(it_1) != edge_1.end(); ++it_1, ++it_2) {
 					FVector edgeVec = hullPoints[*next(it_1)].vec - hullPoints[*it_1].vec;
 					FVector normal = norm(cross(edgeVec, extrusion));
-					newQuads.emplace(*it_1, *next(it_1), *next(it_2), *it_2, normal);
+					newQuads.emplace(this, *it_1, *next(it_1), *next(it_2), *it_2, normal);
 				}
 
 			}
@@ -339,7 +341,7 @@ void CnvH::Add(FVector extrusion) {
 
 // Returns the determinant of a 3x3 matrix constructed by the column vector parameters
 inline float det3(FVector a, FVector b, FVector c) {
-	return a.x * b.y * c.z + a.y * b.z * c.x + a.z * b.x * c.y - a.x * b.z * c.y - a.y * b.x * c.z - a.z * b.y * c.x;
+	return a.x*b.y*c.z + a.z*b.x*c.y + a.y*b.z*c.x - a.x*b.z*c.y - a.y*b.x*c.z - a.z*b.y*c.x;
 }
 
 void CnvH::Disolve(FVector vec) {
@@ -349,22 +351,31 @@ void CnvH::Disolve(FVector vec) {
 	// Where A and B are quad edges and O is their common point
 	// and k, m and n are real number coaficents
 	float k, m, n;
-	auto it = hullQuads.begin();
-	for (; it != hullQuads.end(); ++it) {
-		FVector vO = it->getPnt(0).vec;
-		FVector vA = it->getPnt(1).vec - it->getPnt(0).vec;
-		FVector vB = it->getPnt(3).vec - it->getPnt(0).vec;
-		float det = det3(vec,-vA,-vB);
+	quad* found = nullptr;
+	for (quad q:hullQuads) {
+		FVector vO = q.getPnt(0).vec;
+		FVector vA = q.getPnt(1).vec - q.getPnt(0).vec;
+		FVector vB = q.getPnt(3).vec - q.getPnt(0).vec;
+		float det = det3(vec, -vA, -vB);
 		if (det == 0.0f) continue;	// vec lays on OAB
 		k = det3(vO, -vA, -vB) / det;
-		if (k <= 0.0f)continue;	//vec intersevts OAB in reverse direction
-		m = det3(vec, -vA, -vB) / det;
-		n = det3(vec, -vA, -vB) / det;
-		if (m>=0.0f && n>=0.0f && m<=1.0f && n<=1.0f) break;
+		if (k <= 0.0f) continue;	//vec intersevts OAB in reverse direction
+		m = det3(vec, vO, -vB) / det;
+		n = det3(vec, -vA, vO) / det;
+		if (m >= 0.0f && n >= 0.0f && m <= 1.0f && n <= 1.0f){
+			found = &q;
+			break;
+		}
 	}
+	if (!found){
+		std::cout << vec << " does not intersect the hull!" << std::endl;
+		return;
+	}
+	std::cout << "k=" << k << "   m=" << m << "   n=" << n << std::endl;
 	float scale = (k > 1.0f) ? k : 1.0f;
-	point pnt = (1.0f - m - n)*it->getPnt(0) + m*it->getPnt(1) + n*it->getPnt(3);
+	point pnt = (1.0f - m - n)*found->getPnt(0) + m*found->getPnt(1) + n*found->getPnt(3);
 	pnt *= scale;
+	std::cout << pnt << std::endl;
 }
 
 std::ofstream& operator<<(std::ofstream& ostr, const CnvH& hull){
@@ -413,7 +424,7 @@ CnvH::quad CnvH::BuildQuad(	edge e1, edge e2, FVector dist )
 	};
 	FVector vec = hullPoints[idx[1]].vec - hullPoints[idx[0]].vec;
 	FVector normal = norm(cross(vec, dist));
-	return quad( idx[0], idx[1], idx[2], idx[3], normal , this);
+	return quad(this, idx[0], idx[1], idx[2], idx[3], normal);
 }
 
 // Returns a quad with reverse normal
@@ -425,7 +436,7 @@ CnvH::quad CnvH::FlipQuad(const quad& q) {
 		q.pointIdx[1],
 	};
 	FVector normal = q.normal * -1.0f;
-	return quad( idx[0], idx[1], idx[2], idx[3], normal, this);
+	return quad(this, idx[0], idx[1], idx[2], idx[3], normal);
 }
 
 bool operator==(const CnvH::edge& A, const CnvH::edge& B) {
@@ -433,11 +444,10 @@ bool operator==(const CnvH::edge& A, const CnvH::edge& B) {
 	return  A.pointIdx[0] == B.pointIdx[0] && A.pointIdx[1] == B.pointIdx[1];
 }
 
-CnvH::point operator*(float A, const CnvH::point& B)
-{
+CnvH::point operator*(float A, const CnvH::point& B){
 	CnvH::point result = B;
 	result.vec *= A;
-	for (auto w : result.weight) {
+	for (auto& w : result.weight) {
 		w.second *= A;
 	}
 	return result;
@@ -446,14 +456,13 @@ CnvH::point operator*(float A, const CnvH::point& B)
 CnvH::point operator*(const CnvH::point& A, float B){
 	CnvH::point result = A;
 	result.vec *= B;
-	for (auto w : result.weight) {
+	for (auto& w : result.weight) {
 		w.second *= B;
 	}
 	return result;
 }
 
-CnvH::point operator+(const CnvH::point& A, const CnvH::point& B)
-{
+CnvH::point operator+(const CnvH::point& A, const CnvH::point& B){
 	CnvH::point pnt = A;
 	pnt.vec += B.vec;
 	for (auto w : B.weight) {
@@ -466,8 +475,7 @@ CnvH::point operator+(const CnvH::point& A, const CnvH::point& B)
 	return pnt;
 }
 
-CnvH::point operator-(const CnvH::point& A, const CnvH::point& B)
-{
+CnvH::point operator-(const CnvH::point& A, const CnvH::point& B){
 	CnvH::point pnt = A;
 	pnt.vec -= B.vec;
 	for (auto w : B.weight) {
@@ -479,4 +487,12 @@ CnvH::point operator-(const CnvH::point& A, const CnvH::point& B)
 		}
 	}
 	return pnt;
+}
+
+std::ostream& operator<<(std::ostream& ostr, const CnvH::point& p){
+	ostr << p.vec << " = ..." << std::endl;
+	for (auto w : p.weight){
+		ostr << w.second << " * #" << w.first << " " << p.parent->hullPoints[w.first].vec << std::endl;
+	}
+	return ostr;
 }

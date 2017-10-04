@@ -39,7 +39,7 @@ inline FVector operator-(const FVector& A, const FVector& B){
 };
 
 inline FVector operator-(const FVector& A) {
-	return FVector{ -A.x, -A.x, -A.z };
+	return FVector{ -A.x, -A.y, -A.z };
 };
 
 inline float dot(const FVector& A, const FVector& B){

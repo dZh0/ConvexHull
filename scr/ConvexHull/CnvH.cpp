@@ -39,8 +39,8 @@ CnvH::CnvH(FVector const* p_arr, int _size) : CnvH::CnvH(){
 // Adds a FVector to the hull.
 void CnvH::Add(FVector extrusion) {
 	size_t collectionIdx;
+	std::cout << "#" << collection.size() << "  " << extrusion;
 	collection.push_back(extrusion);
-	std::cout << "#"<< collection.size() << "  " << extrusion;
 	if (extrusion == FV_ZERO) return;		// Don't change geometry if vector is {0,0,0}
 	
 	std::queue<point> newPoints;			// Points to be added during the extrusion (FiFo)
@@ -297,7 +297,6 @@ void CnvH::Add(FVector extrusion) {
 				}
 			}
 
-
 			// Build quads betwean edge_1 and edge_2
 			for (auto it_1 = edge_1.begin(), it_2 = edge_2.begin(); it_1 != edge_1.end(); ++it_1, ++it_2) {
 				newQuads.push(BuildQuad(*it_1, *it_2, extrusion));
@@ -345,6 +344,7 @@ inline float det3(FVector a, FVector b, FVector c) {
 }
 
 void CnvH::Disolve(FVector vec) {
+	point pnt(this);
 	// Intersection point P is part of the line vec -> P = k*vec
 	// Intersection point P is part of the plane OAB -> P = O + m*A + n*B
 	// -> k*V - m*A - n*B = O
@@ -352,18 +352,20 @@ void CnvH::Disolve(FVector vec) {
 	// and k, m and n are real number coaficents
 	float k, m, n;
 	quad* found = nullptr;
-	for (quad q:hullQuads) {
+	for (quad& q:hullQuads) {
+		if (dot(vec, q.normal) < 0.0f) continue;
 		FVector vO = q.getPnt(0).vec;
 		FVector vA = q.getPnt(1).vec - q.getPnt(0).vec;
 		FVector vB = q.getPnt(3).vec - q.getPnt(0).vec;
 		float det = det3(vec, -vA, -vB);
 		if (det == 0.0f) continue;	// vec lays on OAB
 		k = det3(vO, -vA, -vB) / det;
-		if (k <= 0.0f) continue;	//vec intersevts OAB in reverse direction
+		assert(k > 0.0f);			// must always be true if dot(vec, q.normal) >= 0.0f
 		m = det3(vec, vO, -vB) / det;
 		n = det3(vec, -vA, vO) / det;
 		if (m >= 0.0f && n >= 0.0f && m <= 1.0f && n <= 1.0f){
 			found = &q;
+			pnt = (1.0f - m - n)*found->getPnt(0) + m*found->getPnt(1) + n*found->getPnt(3);
 			break;
 		}
 	}
@@ -371,9 +373,39 @@ void CnvH::Disolve(FVector vec) {
 		std::cout << vec << " does not intersect the hull!" << std::endl;
 		return;
 	}
-	std::cout << "k=" << k << "   m=" << m << "   n=" << n << std::endl;
+	std::list<quad*> selectQuads;
+	for (quad& q : hullQuads) {
+		if(q.normal == found->normal) selectQuads.push_back(&q);
+	}
+	if (selectQuads.size() > 1){
+		std::cout << "polygon" << std::endl;
+		// Find open edges:
+		std::list<edge> edge_1 = FindOpenEdges(selectQuads);
+		// Intersection point Q is part of the line OP -> Q = p*(k*vec-O)
+		// Intersection point Q is part of the edge E1 E2 -> Q = E1 + q*(E2-E1)
+		// -> k*p*vec - p*O - q*(E2-E1) = E1
+		// Where E1 and E2 are end points of the edge of the polygon and O and P are points of found quad
+		// and k, p, and q are real number coaficents and kp = k*p
+		float kp, p, q;
+		FVector vO = found->getPnt(0).vec;
+		for (edge& e : edge_1){
+			FVector vE1 = hullPoints[e.pointIdx[0]].vec;
+			FVector vE2 = hullPoints[e.pointIdx[1]].vec;
+			float det = det3(vec, -vO, vE1-vE2);
+			if (det == 0.0f) continue;
+			kp = det3(vE1, -vO, vE1 - vE2) / det;
+			p = det3(vec, vE1, vE1 - vE2) / det;
+			q = det3(vec, -vO, vE1) / det;
+			assert(p != 0.0f); //must always be true if det != 0.0f
+			k = kp / p;
+			assert(k >= 0.0f);
+			if (q >= 0.0f && q <= 1.0f){
+				pnt = hullPoints[e.pointIdx[0]] + q*(hullPoints[e.pointIdx[1]] - hullPoints[e.pointIdx[0]]);
+				break;
+			}
+		}
+	}
 	float scale = (k > 1.0f) ? k : 1.0f;
-	point pnt = (1.0f - m - n)*found->getPnt(0) + m*found->getPnt(1) + n*found->getPnt(3);
 	pnt *= scale;
 	std::cout << pnt << std::endl;
 }
@@ -463,6 +495,7 @@ CnvH::point operator*(const CnvH::point& A, float B){
 }
 
 CnvH::point operator+(const CnvH::point& A, const CnvH::point& B){
+	if (B.vec == FV_ZERO) return A;
 	CnvH::point pnt = A;
 	pnt.vec += B.vec;
 	for (auto w : B.weight) {
@@ -476,6 +509,7 @@ CnvH::point operator+(const CnvH::point& A, const CnvH::point& B){
 }
 
 CnvH::point operator-(const CnvH::point& A, const CnvH::point& B){
+	if (B.vec == FV_ZERO) return A;
 	CnvH::point pnt = A;
 	pnt.vec -= B.vec;
 	for (auto w : B.weight) {
@@ -489,10 +523,11 @@ CnvH::point operator-(const CnvH::point& A, const CnvH::point& B){
 	return pnt;
 }
 
+#include <iomanip>
 std::ostream& operator<<(std::ostream& ostr, const CnvH::point& p){
-	ostr << p.vec << " = ..." << std::endl;
 	for (auto w : p.weight){
-		ostr << w.second << " * #" << w.first << " " << p.parent->hullPoints[w.first].vec << std::endl;
+		ostr << std::fixed << std::setprecision(6);
+		ostr << w.second << " * #" << w.first << " " << p.parent->collection[w.first] << std::endl;
 	}
 	return ostr;
 }

@@ -347,7 +347,7 @@ void CnvH::Disolve(FVector vec) {
 	point pnt(this);
 	// Intersection point P is part of the line vec -> P = k*vec
 	// Intersection point P is part of the plane OAB -> P = O + m*A + n*B
-	// -> k*V - m*A - n*B = O
+	// -> k*vec - m*A - n*B = O
 	// Where A and B are quad edges and O is their common point
 	// and k, m and n are real number coaficents
 	float k, m, n;
@@ -375,17 +375,20 @@ void CnvH::Disolve(FVector vec) {
 	}
 	std::list<quad*> selectQuads;
 	for (quad& q : hullQuads) {
-		if(q.normal == found->normal) selectQuads.push_back(&q);
+		if (q.normal == found->normal){
+			selectQuads.push_back(&q);
+		}
 	}
 	if (selectQuads.size() > 1){
 		std::cout << "polygon" << std::endl;
 		// Find open edges:
 		std::list<edge> edge_1 = FindOpenEdges(selectQuads);
-		// Intersection point Q is part of the line OP -> Q = p*(k*vec-O)
-		// Intersection point Q is part of the edge E1 E2 -> Q = E1 + q*(E2-E1)
-		// -> k*p*vec - p*O - q*(E2-E1) = E1
-		// Where E1 and E2 are end points of the edge of the polygon and O and P are points of found quad
-		// and k, p, and q are real number coaficents and kp = k*p
+		// Intersection point P is part of the line vec -> P = k*vec
+		// The line through P and the polygon base point intersects an edge (with end points E1 and E2) at poin Q ->
+		// -> Q = E1 + q*(E2-E1) and P = base + p*(Q - base)
+		// -> k*vec = base + p*(E1 + q*(E2-E1) - base)
+		// -> base = k*vec + p*(base - E1) + p*q*(E1 - E2)
+		// where k, p and q are real number coaficents
 		float kp, p, q;
 		FVector vO = found->getPnt(0).vec;
 		for (edge& e : edge_1){
@@ -474,6 +477,13 @@ CnvH::quad CnvH::FlipQuad(const quad& q) {
 bool operator==(const CnvH::edge& A, const CnvH::edge& B) {
 	if (&A == &B) return true;
 	return  A.pointIdx[0] == B.pointIdx[0] && A.pointIdx[1] == B.pointIdx[1];
+}
+
+CnvH::point CnvH::Common(const point& A, const point& B){
+	point result = A;
+	for (auto& w : result.weight) {
+		
+	}
 }
 
 CnvH::point operator*(float A, const CnvH::point& B){

@@ -53,6 +53,7 @@ private:
 	std::list<edge> FindOpenEdges(std::list<quad*>& quadArr);
 	quad BuildQuad(edge e1, edge e2, FVector dist);
 	quad FlipQuad(const quad& q);
+	point BasePoint(const std::list<edge>& edges);
 	point Common(const point& A, const point& B);
 	friend bool operator==(const CnvH::edge& A, const CnvH::edge& B);
 	friend point operator*(float A, const point& B);

@@ -383,27 +383,28 @@ void CnvH::Disolve(FVector vec) {
 		std::cout << "polygon" << std::endl;
 		// Find open edges:
 		std::list<edge> edge_1 = FindOpenEdges(selectQuads);
+		point base = BasePoint(edge_1);
 		// Intersection point P is part of the line vec -> P = k*vec
 		// The line through P and the polygon base point intersects an edge (with end points E1 and E2) at poin Q ->
 		// -> Q = E1 + q*(E2-E1) and P = base + p*(Q - base)
 		// -> k*vec = base + p*(E1 + q*(E2-E1) - base)
 		// -> base = k*vec + p*(base - E1) + p*q*(E1 - E2)
 		// where k, p and q are real number coaficents
-		float kp, p, q;
-		FVector vO = found->getPnt(0).vec;
+		float k, p, q, pq;
+		FVector vBase = base.vec;
 		for (edge& e : edge_1){
 			FVector vE1 = hullPoints[e.pointIdx[0]].vec;
 			FVector vE2 = hullPoints[e.pointIdx[1]].vec;
-			float det = det3(vec, -vO, vE1-vE2);
+			float det = det3(vec, vBase - vE1, vE1 - vE2);
 			if (det == 0.0f) continue;
-			kp = det3(vE1, -vO, vE1 - vE2) / det;
-			p = det3(vec, vE1, vE1 - vE2) / det;
-			q = det3(vec, -vO, vE1) / det;
-			assert(p != 0.0f); //must always be true if det != 0.0f
-			k = kp / p;
+			k = det3(vBase, vBase - vE1, vE1 - vE2) / det;
+			p = det3(vec, vBase, vE1 - vE2) / det;
+			pq = det3(vec, vBase - vE1, vBase) / det;
+			assert(p != 0.0f); // TODO: check when this is not true
+			q = pq / p;
 			assert(k >= 0.0f);
 			if (q >= 0.0f && q <= 1.0f){
-				pnt = hullPoints[e.pointIdx[0]] + q*(hullPoints[e.pointIdx[1]] - hullPoints[e.pointIdx[0]]);
+				pnt = base + p*(hullPoints[e.pointIdx[0]]-base) + pq*(hullPoints[e.pointIdx[1]] - hullPoints[e.pointIdx[0]]);
 				break;
 			}
 		}
@@ -479,11 +480,29 @@ bool operator==(const CnvH::edge& A, const CnvH::edge& B) {
 	return  A.pointIdx[0] == B.pointIdx[0] && A.pointIdx[1] == B.pointIdx[1];
 }
 
+CnvH::point CnvH::BasePoint(const std::list<edge>& edges){
+	auto it = edges.begin();
+	point result = hullPoints[it->pointIdx[0]];
+	++it;
+	while (it != edges.end()){
+		result = Common(result, hullPoints[it->pointIdx[0]]);
+		++it;
+	}
+	return result;
+}
+
 CnvH::point CnvH::Common(const point& A, const point& B){
 	point result = A;
-	for (auto& w : result.weight) {
-		
+	auto it = result.weight.begin();
+	while (it != result.weight.end()) {
+		auto found = B.weight.find(it->first);
+		if (found != B.weight.end()) {
+			it->second = (it->second < found->second) ? it->second : found->second;
+			++it;
+		}
+		else it = result.weight.erase(it);
 	}
+	return result;
 }
 
 CnvH::point operator*(float A, const CnvH::point& B){

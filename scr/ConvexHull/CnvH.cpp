@@ -169,12 +169,8 @@ void CnvH::Add(FVector extrusion) {
 				FVector direction = cross(hullNormal, extrusion);
 				for (auto it = edge_1.begin(); it != edge_1.end();) {
 					FVector edgeVec = hullPoints[it->pointIdx[1]].vec - hullPoints[it->pointIdx[0]].vec;
-					if (dot(edgeVec, direction) <= 0.0f) {
-						it = edge_1.erase(it);
-					}
-					else {
-						++it;
-					}
+					if (dot(edgeVec, direction) <= 0.0f) it = edge_1.erase(it);
+					else ++it;
 				}
 
 				// Clone the points from edge_1 to edge 2 and mark them for move
@@ -302,10 +298,7 @@ void CnvH::Add(FVector extrusion) {
 				newQuads.push(BuildQuad(*it_1, *it_2, extrusion));
 			}
 		}break;	//end "case volume"
-
-		default:
-			assert("Convex Hull state not properly defined!");
-			break;
+		default: assert("Convex Hull state not properly defined!"); break;
 		}
 	} // end if vector in the same direction is NOT found in the collection
 
@@ -345,73 +338,139 @@ inline float det3(FVector a, FVector b, FVector c) {
 
 void CnvH::Disolve(FVector vec) {
 	point pnt(this);
-	// Intersection point P is part of the line vec -> P = k*vec
-	// Intersection point P is part of the plane OAB -> P = O + m*A + n*B
-	// -> k*vec - m*A - n*B = O
-	// Where A and B are quad edges and O is their common point
-	// and k, m and n are real number coaficents
-	float k, m, n;
-	quad* found = nullptr;
-	for (quad& q:hullQuads) {
-		if (dot(vec, q.normal) < 0.0f) continue;
-		FVector vO = q.getPnt(0).vec;
-		FVector vA = q.getPnt(1).vec - q.getPnt(0).vec;
-		FVector vB = q.getPnt(3).vec - q.getPnt(0).vec;
-		float det = det3(vec, -vA, -vB);
-		if (det == 0.0f) continue;	// vec lays on OAB
-		k = det3(vO, -vA, -vB) / det;
-		assert(k > 0.0f);			// must always be true if dot(vec, q.normal) >= 0.0f
-		m = det3(vec, vO, -vB) / det;
-		n = det3(vec, -vA, vO) / det;
-		if (m >= 0.0f && n >= 0.0f && m <= 1.0f && n <= 1.0f){
-			found = &q;
-			pnt = (1.0f - m - n)*found->getPnt(0) + m*found->getPnt(1) + n*found->getPnt(3);
-			break;
+	float scale;
+	switch (state){
+	case linear: {
+		float del = 0.0f;
+		for (const point& p : hullPoints){
+			float newDel = dot(vec, p.vec);
+			if (newDel > del){
+				del = newDel;
+				pnt = p;
+			}
 		}
-	}
-	if (!found){
-		std::cout << vec << " does not intersect the hull!" << std::endl;
-		return;
-	}
-	std::list<quad*> selectQuads;
-	for (quad& q : hullQuads) {
-		if (q.normal == found->normal){
-			selectQuads.push_back(&q);
+		if (del == 0.0f){
+			std::cout << vec << " does not intersect the hull!" << std::endl;
+			return;
 		}
-	}
-	if (selectQuads.size() > 1){
-		std::cout << "polygon" << std::endl;
-		// Find open edges:
+		float lenP = Length(pnt.vec);
+		float lenV = Length(vec);
+
+	}break;
+	case planar: {
+		FVector normal = hullQuads[0].normal;
+		std::list<quad*> selectQuads;
+		for (quad& q : hullQuads) selectQuads.push_back(&q);
 		std::list<edge> edge_1 = FindOpenEdges(selectQuads);
-		point base = BasePoint(edge_1);
-		// Intersection point P is part of the line vec -> P = k*vec
-		// The line through P and the polygon base point intersects an edge (with end points E1 and E2) at poin Q ->
-		// -> Q = E1 + q*(E2-E1) and P = base + p*(Q - base)
-		// -> k*vec = base + p*(E1 + q*(E2-E1) - base)
-		// -> base = k*vec + p*(base - E1) + p*q*(E1 - E2)
-		// where k, p and q are real number coaficents
-		float k, p, q, pq;
-		FVector vBase = base.vec;
+		point base = point(this);
+		// Vector P is the projection of vec on the plane -> P = vec - n*normal
+		// Point Q is part of the edge E1:E2 and part of line define by P -> E1 + q*(E2-E1) = k * P
+		// -> k*vec - n*k*normal + q*(E1-E2) = E1
+		// and n, k, and q are real number coaficents
+		float n, k, q, nk;
+		FVector vBase = FV_ZERO;
 		for (edge& e : edge_1){
 			FVector vE1 = hullPoints[e.pointIdx[0]].vec;
 			FVector vE2 = hullPoints[e.pointIdx[1]].vec;
-			float det = det3(vec, vBase - vE1, vE1 - vE2);
+			float det = det3(vec, -normal, vE1 - vE2);
 			if (det == 0.0f) continue;
-			k = det3(vBase, vBase - vE1, vE1 - vE2) / det;
-			p = det3(vec, vBase, vE1 - vE2) / det;
-			pq = det3(vec, vBase - vE1, vBase) / det;
-			assert(p != 0.0f); // TODO: check when this is not true
-			q = pq / p;
-			assert(k >= 0.0f);
+			k = det3(vE1, -normal, vE1 - vE2) / det;
+			nk = det3(vec, vE1, vE1 - vE2) / det;
+			q = det3(vec, -normal, vE1) / det;
+			if (k == 0.0f)
+			{
+				pnt = base;
+				continue;
+			}
+			n = nk / k;
+			if (n != 0.0f)
+			{
+				pnt = base;
+				std::cout << vec << " does not intersect the hull!" << std::endl;
+				break;
+			}
 			if (q >= 0.0f && q <= 1.0f){
-				pnt = base + p*(hullPoints[e.pointIdx[0]]-base) + pq*(hullPoints[e.pointIdx[1]] - hullPoints[e.pointIdx[0]]);
+				pnt = hullPoints[e.pointIdx[0]] + q*(hullPoints[e.pointIdx[1]] - hullPoints[e.pointIdx[0]]);
 				break;
 			}
 		}
+		scale = (k > 1.0f) ? k : 1.0f;
+	} break;
+	case volume: {
+		// Intersection point P is part of the line vec -> P = k*vec
+		// Intersection point P is part of the plane OAB -> P = O + m*A + n*B
+		// -> k*vec - m*A - n*B = O
+		// Where A and B are quad edges and O is their common point
+		// and k, m and n are real number coaficents
+		float k, m, n;
+		quad* found = nullptr;
+		for (quad& q : hullQuads) {
+			if (dot(vec, q.normal) < 0.0f) continue;
+			FVector vO = q.getPnt(0).vec;
+			FVector vA = q.getPnt(1).vec - q.getPnt(0).vec;
+			FVector vB = q.getPnt(3).vec - q.getPnt(0).vec;
+			float det = det3(vec, -vA, -vB);
+			if (det == 0.0f) continue;	// vec lays on OAB
+			k = det3(vO, -vA, -vB) / det;
+			assert(k > 0.0f);			// must always be true if dot(vec, q.normal) >= 0.0f
+			m = det3(vec, vO, -vB) / det;
+			n = det3(vec, -vA, vO) / det;
+			if (m >= 0.0f && n >= 0.0f && m <= 1.0f && n <= 1.0f){
+				found = &q;
+				pnt = (1.0f - m - n)*found->getPnt(0) + m*found->getPnt(1) + n*found->getPnt(3);
+				break;
+			}
+		}
+		if (!found){
+			std::cout << vec << " does not intersect the hull!" << std::endl;
+			return;
+		}
+		std::list<quad*> selectQuads;
+		for (quad& q : hullQuads) {
+			if (q.normal == found->normal){
+				selectQuads.push_back(&q);
+			}
+		}
+		if (selectQuads.size() > 1){
+			// Find open edges:
+			std::list<edge> edge_1 = FindOpenEdges(selectQuads);
+			point base = BasePoint(edge_1);
+			// Intersection point P is part of the line vec -> P = k*vec
+			// The line through P and the polygon base point intersects an edge (with end points E1 and E2) at poin Q ->
+			// -> Q = E1 + q*(E2-E1) and P = base + p*(Q - base)
+			// -> k*vec = base + p*(E1 + q*(E2-E1) - base)
+			// -> base = k*vec + p*(base - E1) + p*q*(E1 - E2)
+			// where k, p and q are real number coaficents
+			float k, p, q, pq;
+			FVector vBase = base.vec;
+			for (edge& e : edge_1){
+				FVector vE1 = hullPoints[e.pointIdx[0]].vec;
+				FVector vE2 = hullPoints[e.pointIdx[1]].vec;
+				float det = det3(vec, vBase - vE1, vE1 - vE2);
+				if (det == 0.0f) continue;
+				k = det3(vBase, vBase - vE1, vE1 - vE2) / det;
+				p = det3(vec, vBase, vE1 - vE2) / det;
+				pq = det3(vec, vBase - vE1, vBase) / det;
+				if (p == 0.0f)
+				{
+					pnt = base;
+					break;
+				}
+				q = pq / p;
+				assert(k >= 0.0f);
+				if (q >= 0.0f && q <= 1.0f){
+					pnt = base + p*(hullPoints[e.pointIdx[0]] - base) + pq*(hullPoints[e.pointIdx[1]] - hullPoints[e.pointIdx[0]]);
+					break;
+				}
+			}
+		}
+		scale = (k > 1.0f) ? k : 1.0f;
+	}break;
+	default: assert("Convex Hull state not properly defined!"); break;
 	}
-	float scale = (k > 1.0f) ? k : 1.0f;
 	pnt *= scale;
 	std::cout << pnt << std::endl;
+	std::cout << "= " << 1.0f/scale << " * " << pnt.vec << std::endl;
 }
 
 std::ofstream& operator<<(std::ofstream& ostr, const CnvH& hull){
@@ -497,10 +556,15 @@ CnvH::point CnvH::Common(const point& A, const point& B){
 	while (it != result.weight.end()) {
 		auto found = B.weight.find(it->first);
 		if (found != B.weight.end()) {
-			it->second = (it->second < found->second) ? it->second : found->second;
+			float scale = (it->second < found->second) ? it->second : found->second;
+			it->second = scale;
+			result.vec -= (1.0f - scale)*collection[found->first];
 			++it;
 		}
-		else it = result.weight.erase(it);
+		else{
+			result.vec -= collection[it->first];
+			it = result.weight.erase(it);
+		}
 	}
 	return result;
 }

@@ -30,7 +30,8 @@ private:
 		std::map<size_t, float> weight;
 
 		point(CnvH* _parent, FVector _vec = FV_ZERO) : parent(_parent), vec(_vec) {};
-		point& operator *= (float a) { for (auto w : weight) w.second *= a;	return *this; };
+		point& operator *= (float a) { for (auto& w : weight) w.second *= a; vec *= a; return *this; };
+		point& operator /= (float a) { for (auto& w : weight) w.second /= a; vec /= a; return *this; };
 	};
 	std::vector<point> hullPoints;			// Points of the Convex Hull (MUST BE INDEXED CONTAINER!)
 

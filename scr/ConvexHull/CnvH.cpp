@@ -6,28 +6,6 @@
 #include <unordered_set>
 #include "CnvH.h"
 
-/*
-CnvH::CnvH(void){
-	state = volume;
-	hullPoints.reserve(8);
-	hullPoints.emplace_back(this, FVector{ 0.0f, 0.0f, 0.0f });
-	hullPoints.emplace_back(this, FVector{ 1.0f, 0.0f, 0.0f });
-	hullPoints.emplace_back(this, FVector{ 1.0f, 1.0f, 0.0f });
-	hullPoints.emplace_back(this, FVector{ 0.0f, 1.0f, 0.0f });
-	hullPoints.emplace_back(this, FVector{ 0.0f, 0.0f, 1.0f });
-	hullPoints.emplace_back(this, FVector{ 1.0f, 0.0f, 1.0f });
-	hullPoints.emplace_back(this, FVector{ 1.0f, 1.0f, 1.0f });
-	hullPoints.emplace_back(this, FVector{ 0.0f, 1.0f, 1.0f });
-	hullQuads.reserve(6);
-	hullQuads.emplace_back(this, 0, 3, 2, 1, FVector{ 0.0f, 0.0f, -1.0f });
-	hullQuads.emplace_back(this, 4, 5, 6, 7, FVector{ 0.0f, 0.0f, 1.0f });
-	hullQuads.emplace_back(this, 0, 1, 5, 4, FVector{ 0.0f, -1.0f, 0.0f });
-	hullQuads.emplace_back(this, 2, 3, 7, 6, FVector{ 0.0f, 1.0f, 0.0f });
-	hullQuads.emplace_back(this, 0, 4, 7, 3, FVector{ -1.0f, 0.0f, 0.0f });
-	hullQuads.emplace_back(this, 1, 2, 6, 5, FVector{ 1.0f, 0.0f, 0.0f });
-};
-*/
-
 // Creates CnvH from C-style FVector array.
 CnvH::CnvH(FVector const* p_arr, int _size) : CnvH::CnvH(){
 	collection.reserve(_size);
@@ -38,7 +16,7 @@ CnvH::CnvH(FVector const* p_arr, int _size) : CnvH::CnvH(){
 
 // Adds a FVector to the hull.
 void CnvH::Add(FVector extrusion) {
-	size_t collectionIdx;
+	size_t collectionIdx = collection.size();
 	std::cout << "#" << collection.size() << "  " << extrusion;
 	collection.push_back(extrusion);
 	if (extrusion == FV_ZERO) return;		// Don't change geometry if vector is {0,0,0}
@@ -48,30 +26,28 @@ void CnvH::Add(FVector extrusion) {
 	std::unordered_set<size_t> moveIdx;		// Unique indecis of points to be moved during the extrusion
 	size_t newIdx = hullPoints.size();		// Keeps track of the index of the newly added points
 
-	// Find if there is already a vector with the same direcion in colection
+	// Find if there is already a vector with the same direcion in the colection
 	auto found = collection.begin();
 	while (found != collection.end()-1) {	// collection.end()-1 as we already added the extrusion in the collection
-		if (isColinear(*found, extrusion) && dot(*found, extrusion) > 0.0f) {
-			break;
-		}
+		if (isColinear(*found, extrusion) && dot(*found, extrusion) > 0.0f) break;
 		++found;
 	}
 	if (found != collection.end()-1) {		// If vector in the same direction IS found in the collection
 		std::cout << "  Move points:             ";
-		collectionIdx = std::distance(collection.begin(), found);
+		size_t foundIdx = std::distance(collection.begin(), found);
 		for (size_t i = 0; i < hullPoints.size(); i++) {
 			const auto& map = hullPoints[i].weight;
-			if (map.find(collectionIdx) != map.end()) {
+			if (map.find(foundIdx) != map.end()) {
 				moveIdx.insert(i);
 			}
 		}
 	}
 	else {									// If vector in the same direction is NOT found in the collection
-		collectionIdx = collection.size()-1;
 		switch (state) {
-			/////////////////////////////////
-			//    Convex Hull is empty:    //
-			/////////////////////////////////
+
+		/////////////////////////////////
+		//    Convex Hull is empty:    //
+		/////////////////////////////////
 		case empty: {
 			std::cout << "  Add first point:         ";
 			state = linear;
@@ -167,7 +143,7 @@ void CnvH::Add(FVector extrusion) {
 
 				// Delete edges that are not facing the extrusion direction (no longer loop)
 				FVector direction = cross(hullNormal, extrusion);
-				for (auto it = edge_1.begin(); it != edge_1.end();) {
+				for (auto it = edge_1.begin(); it != edge_1.end();){
 					FVector edgeVec = hullPoints[it->pointIdx[1]].vec - hullPoints[it->pointIdx[0]].vec;
 					if (dot(edgeVec, direction) <= 0.0f) it = edge_1.erase(it);
 					else ++it;
@@ -341,6 +317,7 @@ void CnvH::Disolve(FVector vec) {
 	float scale;
 	switch (state){
 	case linear: {
+		float k;
 		float del = 0.0f;
 		for (const point& p : hullPoints){
 			float newDel = dot(vec, p.vec);
@@ -349,13 +326,13 @@ void CnvH::Disolve(FVector vec) {
 				pnt = p;
 			}
 		}
-		if (del == 0.0f){
+		const float CosTolerance = 0.0f;
+		if (abs(del / (Length(vec)*Length(pnt.vec))) < 1.0f - CosTolerance){
 			std::cout << vec << " does not intersect the hull!" << std::endl;
 			return;
 		}
-		float lenP = Length(pnt.vec);
-		float lenV = Length(vec);
-
+		k = del / LengthSq(vec);
+		scale = k;
 	}break;
 	case planar: {
 		FVector normal = hullQuads[0].normal;
@@ -394,7 +371,7 @@ void CnvH::Disolve(FVector vec) {
 				break;
 			}
 		}
-		scale = (k > 1.0f) ? k : 1.0f;
+		scale = k;
 	} break;
 	case volume: {
 		// Intersection point P is part of the line vec -> P = k*vec
@@ -464,13 +441,15 @@ void CnvH::Disolve(FVector vec) {
 				}
 			}
 		}
-		scale = (k > 1.0f) ? k : 1.0f;
+		scale = k;
 	}break;
 	default: assert("Convex Hull state not properly defined!"); break;
 	}
-	pnt *= scale;
+//	scale = (scale > 1.0f) ? 1.0f : scale;
+	pnt /= (scale < 1.0f) ? 1.0f : scale;
+	scale = (scale > 1.0f) ? 1.0f : scale;
 	std::cout << pnt << std::endl;
-	std::cout << "= " << 1.0f/scale << " * " << pnt.vec << std::endl;
+	std::cout << "= " << scale << " * " << vec << std::endl;
 }
 
 std::ofstream& operator<<(std::ofstream& ostr, const CnvH& hull){
@@ -619,7 +598,7 @@ CnvH::point operator-(const CnvH::point& A, const CnvH::point& B){
 #include <iomanip>
 std::ostream& operator<<(std::ostream& ostr, const CnvH::point& p){
 	for (auto w : p.weight){
-		ostr << std::fixed << std::setprecision(6);
+		ostr << std::fixed << std::setprecision(5);
 		ostr << w.second << " * #" << w.first << " " << p.parent->collection[w.first] << std::endl;
 	}
 	return ostr;

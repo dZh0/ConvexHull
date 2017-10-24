@@ -13,8 +13,11 @@
 
 int main() {
 	CnvH CH_empty;
+	const std::string inFileName = "../Input/inputTest.txt";
+	const std::string outFileName = "../Input/CnvH.obj";
+	std::cout << "... Loading vectors from: " << inFileName << std::endl << std::endl;
 	std::ifstream in;
-	in.open("../Input/inputTest.txt");
+	in.open(inFileName);
 	while (!in.eof()){
 		float x,y,z;
 		in >> x >> y >> z;
@@ -22,8 +25,9 @@ int main() {
 		CH_empty.Add(vec);
 	};
 	in.close();
+	std::cout << std::endl << "... Exporting .obj file: " << outFileName << std::endl;
 	std::ofstream out;
-	out.open("../Input/CnvH.obj");
+	out.open(outFileName);
 	out << CH_empty;
 	out.close();
 	while (true) {
